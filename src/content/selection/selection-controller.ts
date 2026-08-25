@@ -15,7 +15,7 @@ import { XTRANSLATOR_DOM } from "../../shared/youtube/youtube-page-contract";
 const PILL_CLASS = "xtranslator-selection-pill";
 const RESULT_CLASS = "xtranslator-selection-result";
 const MOUNT_SELECTION = XTRANSLATOR_DOM.mountSelection;
-const SELECTION_DEBOUNCE_MS = 280;
+const SELECTION_DEBOUNCE_MS = 100;
 
 export class SelectionController {
   private pill: HTMLElement | null = null;
@@ -27,6 +27,7 @@ export class SelectionController {
   public constructor(private readonly documentNode: Document) {}
 
   public start(): void {
+    this.documentNode.addEventListener("mousedown", this.onMouseDown);
     this.documentNode.addEventListener("mouseup", this.onMouseUp);
     this.documentNode.addEventListener("keyup", this.onKeyUp);
     this.documentNode.addEventListener("scroll", this.hideOverlays, true);
@@ -53,6 +54,17 @@ export class SelectionController {
         return false;
       });
   }
+
+  private onMouseDown = (event: MouseEvent): void => {
+    if (!this.selectionEnabled || this.isOwnOverlay(event.target as Node | null)) {
+      return;
+    }
+    // If the second click arrives after an earlier timer has fired, remove
+    // that stale intermediate pill before the final selection is produced.
+    if (event.detail >= 2) {
+      this.hideOverlays();
+    }
+  };
 
   private onMouseUp = (event: MouseEvent): void => {
     if (!this.selectionEnabled) {
