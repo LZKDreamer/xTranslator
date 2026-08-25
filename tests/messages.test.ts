@@ -5,6 +5,7 @@ import {
   isTranslateTextResponse,
   isTranslateVideoResponse,
   isVideoCacheStats,
+  isVideoTranslationCacheResponse,
   isVideoTranslationStatus,
   MESSAGE_TYPE,
   parseExtensionMessage,
@@ -17,6 +18,11 @@ describe("extension messages", () => {
     });
     expect(parseExtensionMessage({ type: "translate" })).toBeNull();
     expect(parseExtensionMessage(null)).toBeNull();
+    expect(parseExtensionMessage({ type: MESSAGE_TYPE.getVideoTranslationStatus, tabId: 12 })).toEqual({
+      type: MESSAGE_TYPE.getVideoTranslationStatus,
+      tabId: 12,
+    });
+    expect(parseExtensionMessage({ type: MESSAGE_TYPE.getVideoTranslationStatus, tabId: -1 })).toBeNull();
   });
 
   it("accepts only complete video translation status updates", () => {
@@ -101,9 +107,38 @@ describe("extension messages", () => {
       }),
     ).toBe(true);
     expect(isTranslateVideoResponse({ ok: true, blocks: [] })).toBe(false);
+    expect(
+      isTranslateVideoResponse({
+        ok: true,
+        blocks: [],
+        targetLanguage: "zh-Hans",
+        displayMode: "bilingual",
+        fromCache: true,
+        missingIds: [],
+        skipped: true,
+      }),
+    ).toBe(true);
   });
 
   it("accepts cache stats, list and clear messages", () => {
+    expect(parseExtensionMessage({ type: MESSAGE_TYPE.getVideoTranslationCache, videoId: "a-b" })).toEqual({
+      type: MESSAGE_TYPE.getVideoTranslationCache,
+      videoId: "a-b",
+    });
+    expect(parseExtensionMessage({ type: MESSAGE_TYPE.getVideoTranslationCache })).toBeNull();
+    expect(isVideoTranslationCacheResponse({ found: false })).toBe(true);
+    expect(
+      isVideoTranslationCacheResponse({
+        found: true,
+        videoId: "v",
+        videoTitle: "Demo",
+        sourceTrackFingerprint: "fp",
+        sourceLanguage: "en",
+        targetLanguage: "zh-Hans",
+        displayMode: "bilingual",
+        blocks: [{ id: "blk-aa", segmentIds: ["yt-abc"], translatedText: "你好", sourceText: "hello", startMs: 0, endMs: 1000 }],
+      }),
+    ).toBe(true);
     expect(parseExtensionMessage({ type: MESSAGE_TYPE.getCacheStats })).toEqual({ type: MESSAGE_TYPE.getCacheStats });
     expect(parseExtensionMessage({ type: MESSAGE_TYPE.listCache })).toEqual({ type: MESSAGE_TYPE.listCache });
     expect(parseExtensionMessage({ type: MESSAGE_TYPE.clearVideoCache, videoId: "a-b" })).toEqual({
@@ -145,6 +180,15 @@ describe("extension messages", () => {
       isTranslateTextResponse({ ok: true, translations: { c1: "你好" }, missingIds: [], targetLanguage: "zh-Hans" }),
     ).toBe(true);
     expect(isTranslateTextResponse({ ok: false, errorMessage: "no key" })).toBe(true);
+    expect(
+      isTranslateTextResponse({
+        ok: true,
+        translations: {},
+        missingIds: [],
+        skippedIds: ["c1"],
+        targetLanguage: "zh-Hans",
+      }),
+    ).toBe(true);
     expect(isTranslateTextResponse({ ok: true, translations: { c1: 1 }, missingIds: [], targetLanguage: "zh-Hans" })).toBe(false);
     expect(isTranslateTextResponse({ ok: true, translations: { c1: "你好" }, targetLanguage: "zh-Hans" })).toBe(false);
   });

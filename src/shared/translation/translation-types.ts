@@ -69,8 +69,7 @@ export interface VideoTranslationCacheEntry {
   sourceTrackFingerprint: string;
   sourceLanguage: string;
   targetLanguage: string;
-  promptVersion: string;
-  blocks: Record<string, string>;
+  blocks: TranslatedBlock[];
   createdAt: number;
   updatedAt: number;
 }

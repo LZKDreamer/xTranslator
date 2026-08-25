@@ -84,31 +84,49 @@ function populateModels(models: readonly string[], current: string, defaultModel
   select.disabled = models.length === 0;
 }
 
-async function loadModels(providerId: string, apiKey: string, currentModel = ""): Promise<void> {
+async function loadModels(
+  providerId: string,
+  apiKey: string,
+  currentModel = "",
+  isCurrent: () => boolean = () => true,
+): Promise<string> {
   const modelSelect = queryRequired<HTMLSelectElement>("#model");
 
   if (!apiKey) {
+    if (!isCurrent()) {
+      return "";
+    }
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
     setModelStatus("填写服务密钥后会加载可用模型。", false);
-    return;
+    return "";
   }
 
+  if (!isCurrent()) {
+    return "";
+  }
   setModelStatus("正在查找可用模型…", false);
   const preset = getProviderPreset(providerId);
   if (!preset) {
+    if (!isCurrent()) {
+      return "";
+    }
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
     setModelStatus("暂时无法识别该翻译服务。", true);
-    return;
+    return "";
   }
 
   try {
     const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
     const result = await adapter.listModels(apiKey);
+    if (!isCurrent()) {
+      return "";
+    }
     if (result.ok) {
       populateModels(result.models, currentModel, preset.defaultModel);
       setModelStatus(`找到 ${result.models.length} 个可用模型。`, false);
+      return modelSelect.value;
     } else {
       modelSelect.replaceChildren();
       modelSelect.disabled = true;
@@ -119,6 +137,7 @@ async function loadModels(providerId: string, apiKey: string, currentModel = "")
     modelSelect.disabled = true;
     setModelStatus("模型列表暂时无法加载，请检查网络或服务密钥。", true);
   }
+  return "";
 }
 
 async function loadCacheList(): Promise<void> {
@@ -188,6 +207,7 @@ let activeProviderId = "";
 let saveChain: Promise<void> = Promise.resolve();
 let saveVersion = 0;
 let apiKeySaveTimer: number | null = null;
+let modelLoadVersion = 0;
 
 function currentFormSettings(): ExtensionSettings | null {
   const providerId = queryRequired<HTMLSelectElement>("#provider-id").value;
@@ -219,8 +239,14 @@ async function loadOptions(): Promise<void> {
   queryRequired<HTMLInputElement>("#selection-enabled").checked = settings.selection.enabled;
   queryRequired<HTMLInputElement>("#include-context").checked = settings.selection.includeContext;
   populateProviders(settings.provider.providerId);
-  await loadModels(settings.provider.providerId, apiKey, settings.provider.model);
-  savedSettings = settings;
+  const resolvedModel = await loadModels(settings.provider.providerId, apiKey, settings.provider.model);
+  const resolvedSettings = resolvedModel && resolvedModel !== settings.provider.model
+    ? { ...settings, provider: { ...settings.provider, model: resolvedModel } }
+    : settings;
+  if (resolvedSettings !== settings) {
+    await createChromeSettingsRepository().saveSettings(resolvedSettings);
+  }
+  savedSettings = resolvedSettings;
   activeProviderId = settings.provider.providerId;
   await loadCacheList();
 }
@@ -294,14 +320,34 @@ function bindForm(): void {
       };
     }
     activeProviderId = providerSelect.value;
+    const providerId = activeProviderId;
+    const loadVersion = ++modelLoadVersion;
     // Switching provider restores the key saved for the newly selected provider,
     // or clears the field when none has been configured yet.
     apiKeyInput.value = savedSettings ? resolveProviderApiKey(savedSettings, providerSelect.value) : "";
-    void loadModels(providerSelect.value, apiKeyInput.value).then(() => queueSettingsSave());
+    // Save the provider immediately. Waiting for the optional model-list request
+    // used to leave the old provider active when the user returned to YouTube
+    // before that request completed.
+    modelSelect.replaceChildren();
+    modelSelect.disabled = true;
+    queueSettingsSave();
+    void loadModels(providerId, apiKeyInput.value, "", () => loadVersion === modelLoadVersion && providerSelect.value === providerId)
+      .then(() => {
+        if (loadVersion === modelLoadVersion && providerSelect.value === providerId) {
+          queueSettingsSave();
+        }
+      });
   });
   apiKeyInput.addEventListener("change", () => {
     clearApiKeySaveTimer();
-    void loadModels(providerSelect.value, apiKeyInput.value, modelSelect.value).then(() => queueSettingsSave());
+    const providerId = providerSelect.value;
+    const loadVersion = ++modelLoadVersion;
+    void loadModels(providerId, apiKeyInput.value, modelSelect.value, () => loadVersion === modelLoadVersion && providerSelect.value === providerId)
+      .then(() => {
+        if (loadVersion === modelLoadVersion && providerSelect.value === providerId) {
+          queueSettingsSave();
+        }
+      });
   });
 
   queryRequired<HTMLButtonElement>("#refresh-cache").addEventListener("click", () => {

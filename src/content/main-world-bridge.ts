@@ -24,6 +24,8 @@ import { YOUTUBE_PAGE_SELECTOR } from "../shared/youtube/youtube-page-contract";
 
 const CAPTION_ACQUISITION_TIMEOUT_MS = 10_000;
 const ACQUISITION_POLL_MS = 150;
+const CAPTION_TRIGGER_RETRY_MS = 2_500;
+const CAPTION_BUTTON_STATE_TIMEOUT_MS = 1_000;
 const CAPTION_HIDE_STYLE_ID = "xtranslator-hide-captions";
 
 interface PlayerWithCaptionApi {
@@ -36,7 +38,13 @@ interface CaptionState {
   previousTrack?: unknown;
 }
 
-const captionBodies = new Map<string, string>();
+interface PendingCaptionCapture {
+  videoId: string;
+  track: { vssId: string; languageCode: string; kind?: string };
+  body: string | null;
+}
+
+let pendingCaptionCapture: PendingCaptionCapture | null = null;
 
 // Temporarily hide the player's native caption overlay while we make the player
 // fetch a caption track, removing the visible "flash" of the original subtitles.
@@ -56,9 +64,30 @@ function setCaptionOverlayHidden(hidden: boolean): void {
 
 function storeCaptionBody(url: string, body: string): void {
   const videoId = readCaptionVideoId(url);
-  if (videoId && body && body.trim().length > 0) {
-    captionBodies.set(videoId, body);
+  const capture = pendingCaptionCapture;
+  if (!capture || videoId !== capture.videoId || !body || body.trim().length === 0) {
+    return;
   }
+
+  try {
+    const parsed = new URL(url);
+    const requestedVssId = parsed.searchParams.get("vss_id");
+    const requestedLanguage = parsed.searchParams.get("lang");
+    const requestedKind = parsed.searchParams.get("kind");
+    if (requestedVssId && requestedVssId !== capture.track.vssId) {
+      return;
+    }
+    if (requestedLanguage && requestedLanguage !== capture.track.languageCode) {
+      return;
+    }
+    if (requestedKind && requestedKind !== (capture.track.kind ?? "")) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  capture.body = body;
 }
 
 // `fetch` hook: record the captions body the player retrieves (without consuming
@@ -117,7 +146,21 @@ function installXhrHook(): void {
   };
 }
 
-function selectCaptionTrack(player: Element, track: { vssId: string; languageCode: string; kind?: string; isTranslatable?: boolean }): boolean {
+function isCaptionButtonPressed(button: HTMLElement): boolean {
+  return button.getAttribute("aria-pressed") === "true" || button.classList.contains("ytp-button-pressed");
+}
+
+async function waitForCaptionButtonState(button: HTMLElement, pressed: boolean): Promise<void> {
+  const deadline = Date.now() + CAPTION_BUTTON_STATE_TIMEOUT_MS;
+  while (Date.now() < deadline && isCaptionButtonPressed(button) !== pressed) {
+    await sleep(50);
+  }
+}
+
+async function selectCaptionTrack(
+  player: Element,
+  track: { vssId: string; languageCode: string; kind?: string; isTranslatable?: boolean },
+): Promise<boolean> {
   const withApi = player as PlayerWithCaptionApi;
   if (typeof withApi.setOption === "function") {
     try {
@@ -136,11 +179,20 @@ function selectCaptionTrack(player: Element, track: { vssId: string; languageCod
 
   const subtitlesButton = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
   if (subtitlesButton) {
-    const pressed = subtitlesButton.getAttribute("aria-pressed");
-    if (pressed !== "true") {
+    // When captions are already on, toggle off/on while the native caption
+    // layer is hidden. This forces the player to issue a fresh request instead
+    // of assuming the previous caption response is still available.
+    if (isCaptionButtonPressed(subtitlesButton)) {
       subtitlesButton.click();
-      return true;
+      await waitForCaptionButtonState(subtitlesButton, false);
+      if (isCaptionButtonPressed(subtitlesButton)) {
+        return false;
+      }
     }
+
+    subtitlesButton.click();
+    await waitForCaptionButtonState(subtitlesButton, true);
+    return true;
   }
 
   return false;
@@ -160,7 +212,7 @@ function readCaptionState(player: Element): CaptionState {
   }
 
   const button = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
-  return { wasOn: button?.getAttribute("aria-pressed") === "true" };
+  return { wasOn: button ? isCaptionButtonPressed(button) : false };
 }
 
 function restoreCaptionState(player: Element, state: CaptionState): void {
@@ -174,12 +226,17 @@ function restoreCaptionState(player: Element, state: CaptionState): void {
       } catch {
         // Best-effort restore.
       }
+    } else {
+      const button = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
+      if (button && !isCaptionButtonPressed(button)) {
+        button.click();
+      }
     }
     return;
   }
 
   const button = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
-  if (button && button.getAttribute("aria-pressed") === "true") {
+  if (button && isCaptionButtonPressed(button)) {
     button.click();
     return;
   }
@@ -193,7 +250,9 @@ function restoreCaptionState(player: Element, state: CaptionState): void {
   }
 }
 
-function triggerCaptionLoad(track: { vssId: string; languageCode: string; kind?: string; isTranslatable?: boolean }): boolean {
+async function triggerCaptionLoad(
+  track: { vssId: string; languageCode: string; kind?: string; isTranslatable?: boolean },
+): Promise<boolean> {
   const player = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.player);
   return player ? selectCaptionTrack(player, track) : false;
 }
@@ -208,29 +267,37 @@ async function obtainTranscript(
 ): Promise<string | null> {
   // Do not reuse a previous track's body. The player is the source of truth for
   // the currently selected track, and the captured body is only a one-shot relay.
-  captionBodies.delete(videoId);
+  const capture: PendingCaptionCapture = { videoId, track, body: null };
+  pendingCaptionCapture = capture;
 
   const player = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.player);
   const state = player ? readCaptionState(player) : { wasOn: false };
 
   setCaptionOverlayHidden(true);
-  const changedPlayerState = triggerCaptionLoad(track);
-
   const deadline = Date.now() + CAPTION_ACQUISITION_TIMEOUT_MS;
+  let changedPlayerState = false;
   let body: string | null = null;
   while (Date.now() < deadline) {
-    body = captionBodies.get(videoId) ?? null;
+    changedPlayerState = (await triggerCaptionLoad(track)) || changedPlayerState;
+    body = capture.body;
     if (body) {
       break;
     }
-    await sleep(ACQUISITION_POLL_MS);
+
+    const retryDeadline = Math.min(Date.now() + CAPTION_TRIGGER_RETRY_MS, deadline);
+    while (Date.now() < retryDeadline && !capture.body) {
+      await sleep(ACQUISITION_POLL_MS);
+    }
+    body = capture.body;
   }
 
   if (player && changedPlayerState) {
     restoreCaptionState(player, state);
   }
   setCaptionOverlayHidden(false);
-  captionBodies.delete(videoId);
+  if (pendingCaptionCapture === capture) {
+    pendingCaptionCapture = null;
+  }
 
   return body;
 }

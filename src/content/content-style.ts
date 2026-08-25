@@ -2,11 +2,11 @@ import { DESIGN_TOKEN } from "../shared/design-tokens";
 import { XTRANSLATOR_DOM, YOUTUBE_PAGE_SELECTOR } from "../shared/youtube/youtube-page-contract";
 
 const CONTENT_STYLE = `
-  .xtranslator-player-mount { position: relative; display: flex; align-items: center; height: 100%; margin-right: 4px; }
-  .xtranslator-control { display: grid; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; box-shadow: none; place-items: center; cursor: pointer; }
+  .xtranslator-player-mount { position: relative; display: flex; flex: 0 0 36px; align-items: center; min-width: 36px; height: 100%; margin-right: 4px; }
+  .xtranslator-control { display: grid; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; box-shadow: none; place-items: center; cursor: pointer; }
   .xtranslator-control svg { display: block; width: 18px; height: 18px; }
   .xtranslator-brand-mark { display: block; object-fit: contain; }
-  .xtranslator-control .xtranslator-brand-mark { width: 20px; height: 20px; border-radius: 6px; }
+  .xtranslator-control .xtranslator-brand-mark { display: block !important; visibility: visible !important; width: 20px; height: 20px; border-radius: 6px; opacity: 1 !important; }
   .xtranslator-control:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 2px; }
   .xtranslator-control:disabled { cursor: progress; opacity: .72; }
   .xtranslator-status { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; display: flex; align-items: center; gap: 6px; max-width: 320px; padding: 8px 12px; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid ${DESIGN_TOKEN.color.borderGlassDark}; border-radius: ${DESIGN_TOKEN.radius.control}; background: ${DESIGN_TOKEN.color.surfaceGlassDark}; box-shadow: ${DESIGN_TOKEN.shadow.float}; backdrop-filter: blur(${DESIGN_TOKEN.blur.glass}); font: 13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

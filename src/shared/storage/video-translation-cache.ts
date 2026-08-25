@@ -1,12 +1,11 @@
 // IndexedDB cache for per-video caption translations.
 //
-// The cache stores translated text keyed by stable translation-block ID inside a
-// single per-video record. The record key is versioned by language and prompt so
-// a change of target language or prompt logic never reuses stale translations.
+// The cache stores complete timed subtitle blocks in one record per video. The
+// key is intentionally only the video ID so reopening a video can render the
+// saved timeline without contacting the caption endpoint or an LLM.
 // It persists parsed text and translations only — never temporary caption URLs,
 // API keys, or request bodies.
 
-import { PROMPT_VERSION } from "../translation/prompt";
 import type { VideoTranslationCacheEntry } from "../translation/translation-types";
 import { openExtensionDatabase } from "./extension-database";
 import { EXTENSION_DATABASE } from "./storage-registry";
@@ -31,13 +30,8 @@ const utf8Encoder = new TextEncoder();
 
 export function buildVideoCacheKey(params: {
   videoId: string;
-  sourceTrackFingerprint: string;
-  sourceLanguage: string;
-  targetLanguage: string;
 }): string {
-  return [params.videoId, params.sourceTrackFingerprint, params.sourceLanguage, params.targetLanguage, PROMPT_VERSION].join(
-    "::",
-  );
+  return params.videoId;
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -111,8 +105,16 @@ export class VideoTranslationRepository implements VideoTranslationCache {
 
   public async clearAll(): Promise<void> {
     const database = await this.db();
-    const transaction = database.transaction(EXTENSION_DATABASE.translationStore, "readwrite");
-    await requestToPromise(transaction.objectStore(EXTENSION_DATABASE.translationStore).clear());
+    // Clear every object store so records from an earlier cache shape or a
+    // future auxiliary cache cannot survive the settings-page reset.
+    const storeNames = Array.from(database.objectStoreNames);
+    if (storeNames.length === 0) {
+      return;
+    }
+    const transaction = database.transaction(storeNames, "readwrite");
+    for (const storeName of storeNames) {
+      transaction.objectStore(storeName).clear();
+    }
     await transactionDone(transaction);
   }
 

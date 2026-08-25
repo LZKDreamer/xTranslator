@@ -45,4 +45,13 @@ describe("YouTube player response contract", () => {
   it("fails closed when required fields are absent", () => {
     expect(parseInitialPlayerResponse([readFixture("invalid-player-response.html")])).toBeNull();
   });
+
+  it("skips an incomplete candidate and parses a later complete player response", () => {
+    expect(
+      parseInitialPlayerResponse([
+        "var ytInitialPlayerResponse = {",
+        readFixture("with-captions-player-response.html"),
+      ])?.videoId,
+    ).toBe("fixture-video-id");
+  });
 });

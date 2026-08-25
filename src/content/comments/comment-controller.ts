@@ -412,8 +412,14 @@ export class CommentTranslationController {
         throw new Error(response.errorMessage);
       }
       const failedIds = new Set(response.missingIds);
+      const skippedIds = new Set(response.skippedIds ?? []);
       let hasFailure = false;
       for (const item of fresh) {
+        if (skippedIds.has(item.id)) {
+          this.commentState.set(item.id, "done");
+          this.removeTranslation(item.id);
+          continue;
+        }
         const translated = response.translations[item.id];
         if (!failedIds.has(item.id) && typeof translated === "string" && translated.trim().length > 0) {
           this.translatedTextById.set(item.id, translated);
@@ -448,6 +454,15 @@ export class CommentTranslationController {
       return;
     }
     this.renderTranslation(commentId, translated ?? "", state === "failed" ? "failed" : "done");
+  }
+
+  private removeTranslation(commentId: string): void {
+    const commentElement = this.collectCommentElements(this.root ?? this.documentNode.documentElement).find(
+      (element) => element.getAttribute(COMMENT_ID_ATTRIBUTE) === commentId,
+    );
+    commentElement
+      ?.querySelector<HTMLElement>(`[${XTRANSLATOR_DOM.mountAttribute}="${MOUNT_COMMENT_TRANSLATION}"]`)
+      ?.remove();
   }
 
   private renderTranslation(commentId: string, translated: string, state: "done" | "failed"): void {

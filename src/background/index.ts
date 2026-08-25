@@ -5,6 +5,7 @@ import {
   parseExtensionMessage,
   MESSAGE_TYPE,
   type SettingsMessageResponse,
+  type VideoTranslationCacheResponse,
   type TranslateTextMessage,
   type TranslateTextResponse,
   type TranslateVideoMessage,
@@ -14,10 +15,12 @@ import {
 import { TextTranslationService } from "../shared/translation/text-translation-service";
 import { AUTO_TARGET_LANGUAGE, resolveProviderApiKey } from "../shared/contracts/settings";
 import { createBrowserLocaleEnvironment, resolveTargetLocale } from "../shared/locale/resolve-target-locale";
+import { shouldTranslateText } from "../shared/locale/translation-needed";
 import { createProviderAdapter, getProviderPreset } from "../shared/providers/provider-registry";
 import { openExtensionDatabase } from "../shared/storage/extension-database";
 import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
 import {
+  buildVideoCacheKey,
   createChromeVideoTranslationRepository,
   type VideoTranslationRepository,
 } from "../shared/storage/video-translation-cache";
@@ -36,18 +39,27 @@ interface TimedTranslationStatus {
 
 const videoTranslationStatuses = new Map<string, TimedTranslationStatus>();
 
-function updateVideoTranslationStatus(status: VideoTranslationStatus): void {
-  // An idle update without a videoId is a reset (e.g. after settings change).
+function updateVideoTranslationStatus(status: VideoTranslationStatus, tabId?: number): void {
+  // An idle update without a videoId clears only the sending tab. The options
+  // page has no tab id and intentionally clears all stale status records.
   if (status.phase === "idle" && status.videoId === undefined) {
-    videoTranslationStatuses.clear();
+    if (tabId === undefined) {
+      videoTranslationStatuses.clear();
+    } else {
+      videoTranslationStatuses.delete(String(tabId));
+    }
     return;
   }
-  if (status.videoId) {
-    videoTranslationStatuses.set(status.videoId, { status, updatedAt: Date.now() });
+  if (status.videoId && tabId !== undefined) {
+    videoTranslationStatuses.set(String(tabId), { status, updatedAt: Date.now() });
   }
 }
 
-function getLatestVideoTranslationStatus(): VideoTranslationStatus {
+function getVideoTranslationStatus(tabId?: number): VideoTranslationStatus {
+  if (tabId !== undefined) {
+    return videoTranslationStatuses.get(String(tabId))?.status ?? { phase: "idle" };
+  }
+
   let latest: TimedTranslationStatus | null = null;
   for (const entry of videoTranslationStatuses.values()) {
     if (!latest || entry.updatedAt > latest.updatedAt) {
@@ -70,6 +82,18 @@ function createTranslationService(): VideoTranslationService {
 
 async function handleTranslateVideo(message: TranslateVideoMessage): Promise<TranslateVideoResponse> {
   const { settings, resolvedTargetLocale } = await getSettingsResponse();
+  if (!shouldTranslateText("", resolvedTargetLocale, message.sourceLanguage)) {
+    return {
+      ok: true,
+      blocks: [],
+      targetLanguage: resolvedTargetLocale,
+      displayMode: settings.subtitles.displayMode,
+      fromCache: true,
+      missingIds: [],
+      skipped: true,
+    };
+  }
+
   const apiKey = resolveProviderApiKey(settings).trim();
   if (!apiKey) {
     return { ok: false, errorMessage: "尚未连接翻译服务，请先完成偏好设置。" };
@@ -93,8 +117,39 @@ async function handleTranslateVideo(message: TranslateVideoMessage): Promise<Tra
   });
 }
 
+async function handleGetVideoTranslationCache(message: { videoId: string }): Promise<VideoTranslationCacheResponse> {
+  const { settings, resolvedTargetLocale } = await getSettingsResponse();
+  const entry = await getVideoTranslationRepository().get(buildVideoCacheKey({ videoId: message.videoId }));
+  if (!entry || entry.blocks.length === 0 || entry.targetLanguage !== resolvedTargetLocale) {
+    return { found: false };
+  }
+  return {
+    found: true,
+    videoId: entry.videoId,
+    videoTitle: entry.videoTitle,
+    sourceTrackFingerprint: entry.sourceTrackFingerprint,
+    sourceLanguage: entry.sourceLanguage,
+    targetLanguage: entry.targetLanguage,
+    displayMode: settings.subtitles.displayMode,
+    blocks: entry.blocks,
+  };
+}
+
 async function handleTranslateText(message: TranslateTextMessage): Promise<TranslateTextResponse> {
   const { settings, resolvedTargetLocale } = await getSettingsResponse();
+  const skippedIds = message.items
+    .filter((item) => !shouldTranslateText(item.sourceText, resolvedTargetLocale))
+    .map((item) => item.id);
+  if (skippedIds.length === message.items.length) {
+    return {
+      ok: true,
+      translations: {},
+      missingIds: [],
+      targetLanguage: resolvedTargetLocale,
+      skippedIds,
+    };
+  }
+
   const apiKey = resolveProviderApiKey(settings).trim();
   if (!apiKey) {
     return { ok: false, errorMessage: "尚未连接翻译服务，请先完成偏好设置。" };
@@ -124,6 +179,7 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
     translations: run.translations,
     missingIds: run.missingIds,
     targetLanguage: resolvedTargetLocale,
+    ...(run.skippedIds && run.skippedIds.length > 0 ? { skippedIds: run.skippedIds } : {}),
     ...(run.errorMessage ? { errorMessage: run.errorMessage } : {}),
   };
 }
@@ -133,29 +189,53 @@ async function reportAsyncFailure(sendResponse: (response: unknown) => void, fal
 }
 
 const CONTEXT_MENU_ID = "xtranslator-translate-selection";
+let contextMenuSync: Promise<void> = Promise.resolve();
 
-async function ensureContextMenu(): Promise<void> {
-  if (typeof chrome === "undefined" || !chrome.contextMenus) {
-    return;
-  }
-
-  let enabled = true;
-  try {
-    enabled = (await createChromeSettingsRepository().loadSettings()).selection.enabled;
-  } catch {
-    // Keep the legacy/default behavior if settings are temporarily unavailable.
-  }
-
-  chrome.contextMenus.removeAll(() => {
-    if (!enabled) {
-      return;
-    }
-    chrome.contextMenus.create({
-      id: CONTEXT_MENU_ID,
-      title: "翻译所选文本",
-      contexts: ["selection"],
+function removeAllContextMenus(): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.contextMenus.removeAll(() => {
+      void chrome.runtime.lastError;
+      resolve();
     });
   });
+}
+
+function createSelectionContextMenu(): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.contextMenus.create(
+      {
+        id: CONTEXT_MENU_ID,
+        title: "翻译所选文本",
+        contexts: ["selection"],
+      },
+      () => {
+        void chrome.runtime.lastError;
+        resolve();
+      },
+    );
+  });
+}
+
+function ensureContextMenu(): Promise<void> {
+  const sync = contextMenuSync.then(async () => {
+    if (typeof chrome === "undefined" || !chrome.contextMenus) {
+      return;
+    }
+
+    let enabled = true;
+    try {
+      enabled = (await createChromeSettingsRepository().loadSettings()).selection.enabled;
+    } catch {
+      // Keep the legacy/default behavior if settings are temporarily unavailable.
+    }
+
+    await removeAllContextMenus();
+    if (enabled) {
+      await createSelectionContextMenu();
+    }
+  });
+  contextMenuSync = sync.catch(() => undefined);
+  return contextMenuSync;
 }
 
 function registerContextMenuListener(): void {
@@ -181,7 +261,7 @@ function registerContextMenuListener(): void {
 
 if (typeof chrome !== "undefined") {
   registerContextMenuListener();
-  chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse: (response: unknown) => void) => {
+  chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse: (response: unknown) => void) => {
     const parsedMessage = parseExtensionMessage(message);
     if (!parsedMessage) {
       sendResponse({ error: "Unsupported xTranslator message." });
@@ -199,11 +279,16 @@ if (typeof chrome !== "undefined") {
           .catch(() => sendResponse({ error: "Unable to read xTranslator settings." }));
         return true;
       case "get-video-translation-status":
-        sendResponse(getLatestVideoTranslationStatus());
+        sendResponse(getVideoTranslationStatus(parsedMessage.tabId));
         return false;
+      case "get-video-translation-cache":
+        void handleGetVideoTranslationCache(parsedMessage)
+          .then(sendResponse)
+          .catch(() => sendResponse({ found: false }));
+        return true;
       case "update-video-translation-status":
         if (isVideoTranslationStatus(parsedMessage.status)) {
-          updateVideoTranslationStatus(parsedMessage.status);
+          updateVideoTranslationStatus(parsedMessage.status, sender.tab?.id);
           sendResponse({ ok: true });
         } else {
           sendResponse({ error: "Invalid xTranslator translation status." });
@@ -231,13 +316,13 @@ if (typeof chrome !== "undefined") {
           .then(([entries, stats]) => {
             sendResponse({
               entries: entries
-                .filter((entry) => typeof entry.blocks === "object" && entry.blocks !== null)
+                .filter((entry) => Array.isArray(entry.blocks))
                 .map((entry) => ({
                   title: entry.videoTitle || entry.videoId,
                   videoId: entry.videoId,
                   sourceLanguage: entry.sourceLanguage,
                   targetLanguage: entry.targetLanguage,
-                  blockCount: Object.keys(entry.blocks).length,
+                  blockCount: entry.blocks.length,
                   updatedAt: entry.updatedAt,
                 })),
               totalBytes: stats.totalBytes,

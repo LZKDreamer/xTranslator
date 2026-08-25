@@ -11,10 +11,10 @@
 import type { TranslationBlockInput } from "./translation-types";
 
 /**
- * Versioned prompt contract. Bumping this invalidates every cached translation,
- * so it is part of the video cache key (see `buildVideoCacheKey`).
+ * Versioned prompt contract for the current translation request. It is not a
+ * cache dimension: a cache record is the saved timed subtitle result for one video.
  */
-export const PROMPT_VERSION = "prompt-v9";
+export const PROMPT_VERSION = "prompt-v10";
 
 const JSON_LINE_EXAMPLE = '{"id":"blk-abc123","text":"translated text"}';
 
@@ -44,7 +44,8 @@ export function buildSystemPrompt(sourceLanguage: string, targetLanguage: string
     "14. Fix an automatic-caption mistake only when the correction is certain from the current source, title or description; never invent names, numbers, facts, events or timing.",
     "15. Do not return, infer or modify timestamps. The application owns all timing.",
     "16. If a block has no spoken content, return an empty text value: {\"id\":\"...\",\"text\":\"\"}.",
-    "17. Output only the JSON lines — no prose, no code fences, no explanation.",
+    "17. Japanese, Korean and other ASR tracks may have no punctuation; treat raw cue boundaries as timing hints, not sentence boundaries, and use only the source text inside the current block.",
+    "18. Output only the JSON lines — no prose, no code fences, no explanation.",
   ].join("\n");
 }
 

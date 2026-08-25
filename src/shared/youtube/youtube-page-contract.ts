@@ -65,6 +65,35 @@ export function findYouTubePageAnchors(documentNode: Document): YouTubePageAncho
     : null;
 }
 
+export function isYouTubeNativeCaptionsEnabled(documentNode: Document): boolean {
+  const button = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
+  if (!button) {
+    return false;
+  }
+
+  const unavailable = button.getAttribute("aria-disabled") === "true"
+    || button.getAttribute("disabled") !== null
+    || button.classList.contains("ytp-button-disabled");
+  return !unavailable && (
+    button.getAttribute("aria-pressed") === "true" || button.classList.contains("ytp-button-pressed")
+  );
+}
+
+export function shouldShowYouTubeTranslationControl(
+  snapshot: YouTubeVideoSnapshot,
+  nativeCaptionsEnabled: boolean,
+): boolean {
+  return snapshot.captionTracks.length > 0 || nativeCaptionsEnabled;
+}
+
+export function shouldKeepYouTubeTranslationControl(
+  snapshot: YouTubeVideoSnapshot,
+  nativeCaptionsEnabled: boolean,
+  alreadyShownForVideo: boolean,
+): boolean {
+  return alreadyShownForVideo || shouldShowYouTubeTranslationControl(snapshot, nativeCaptionsEnabled);
+}
+
 export function findExtensionMount(documentNode: Document, mount: string): HTMLElement | null {
   return documentNode.querySelector<HTMLElement>(`${YOUTUBE_PAGE_SELECTOR.extensionMount}[${XTRANSLATOR_DOM.mountAttribute}="${mount}"]`);
 }

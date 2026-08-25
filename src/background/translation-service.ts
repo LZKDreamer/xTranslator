@@ -10,7 +10,7 @@
 
 import type { TranslateVideoMessage, TranslateVideoResponse } from "../shared/contracts/messages";
 import type { CaptionDisplayMode } from "../shared/contracts/settings";
-import { PROMPT_VERSION, buildSystemPrompt, buildUserPrompt, type VideoPromptContext } from "../shared/translation/prompt";
+import { buildSystemPrompt, buildUserPrompt, type VideoPromptContext } from "../shared/translation/prompt";
 import { PROMPT_OVERHEAD_TOKENS } from "../shared/translation/chunker";
 import { computeInputTokenBudget } from "../shared/translation/chunker";
 import {
@@ -31,6 +31,7 @@ import {
   buildVideoCacheKey,
   type VideoTranslationCache,
 } from "../shared/storage/video-translation-cache";
+import { shouldTranslateText } from "../shared/locale/translation-needed";
 
 const MAX_TRANSLATION_ATTEMPTS = 2;
 const DEFAULT_TEMPERATURE = 0.1;
@@ -77,16 +78,36 @@ export class VideoTranslationService {
   ) {}
 
   public async translate(request: TranslateVideoMessage, context: TranslationRunContext): Promise<TranslateVideoResponse> {
-    const inputBlocks = buildTranslationBlocks(request.segments, context.adapter.preset.contextWindowTokens);
-    const cacheKey = buildVideoCacheKey({
-      videoId: request.videoId,
-      sourceTrackFingerprint: request.sourceTrackFingerprint,
-      sourceLanguage: request.sourceLanguage,
-      targetLanguage: context.targetLanguage,
-    });
+    if (!shouldTranslateText("", context.targetLanguage, context.sourceLanguage)) {
+      return {
+        ok: true,
+        blocks: [],
+        targetLanguage: context.targetLanguage,
+        displayMode: context.displayMode,
+        fromCache: true,
+        missingIds: [],
+        skipped: true,
+      };
+    }
+
+    const inputBlocks = buildTranslationBlocks(
+      request.segments,
+      context.adapter.preset.contextWindowTokens,
+      undefined,
+      undefined,
+      undefined,
+      request.sourceLanguage,
+    );
+    const cacheKey = buildVideoCacheKey({ videoId: request.videoId });
 
     const existing = await this.cache.get(cacheKey);
-    const cachedBlocks = existing?.blocks ?? {};
+    const cacheMatchesRequest = existing !== null &&
+      existing.videoId === request.videoId &&
+      existing.sourceTrackFingerprint === request.sourceTrackFingerprint &&
+      existing.sourceLanguage === request.sourceLanguage &&
+      existing.targetLanguage === context.targetLanguage;
+    const compatibleCache = cacheMatchesRequest ? existing : null;
+    const cachedBlocks = new Map((compatibleCache?.blocks ?? []).map((block) => [block.id, block]));
 
     const resolved: TranslatedBlock[] = [];
     const pending: TranslationBlockInput[] = [];
@@ -96,9 +117,7 @@ export class VideoTranslationService {
         resolved.push(toTranslatedBlock(block, "", context.targetLanguage));
         continue;
       }
-      const cachedText = typeof cachedBlocks[block.id] === "string"
-        ? cleanTranslatedCaptionText(cachedBlocks[block.id]!, context.targetLanguage)
-        : "";
+      const cachedText = cleanTranslatedCaptionText(cachedBlocks.get(block.id)?.translatedText ?? "", context.targetLanguage);
       if (cachedText) {
         resolved.push(toTranslatedBlock(block, cachedText, context.targetLanguage));
       } else {
@@ -108,7 +127,7 @@ export class VideoTranslationService {
 
     const fromCache = pending.length === 0;
     let missingIds: string[] = [];
-    let latestCache: VideoTranslationCacheEntry | null = existing;
+    let latestCache: VideoTranslationCacheEntry | null = compatibleCache;
     const persistProgress: ProgressWriter = async (newBlocks) => {
       if (newBlocks.length === 0) {
         return;
@@ -195,12 +214,12 @@ export class VideoTranslationService {
     cacheKey: string,
     request: TranslateVideoMessage,
     context: TranslationRunContext,
-    existing: { blocks: Record<string, string>; createdAt?: number } | null,
+    existing: VideoTranslationCacheEntry | null,
     newBlocks: readonly TranslatedBlock[],
   ): Promise<VideoTranslationCacheEntry> {
-    const merged: Record<string, string> = { ...(existing?.blocks ?? {}) };
+    const merged = new Map((existing?.blocks ?? []).map((block) => [block.id, block]));
     for (const block of newBlocks) {
-      merged[block.id] = block.translatedText;
+      merged.set(block.id, block);
     }
 
     const entry: VideoTranslationCacheEntry = {
@@ -210,8 +229,7 @@ export class VideoTranslationService {
       sourceTrackFingerprint: request.sourceTrackFingerprint,
       sourceLanguage: request.sourceLanguage,
       targetLanguage: context.targetLanguage,
-      promptVersion: PROMPT_VERSION,
-      blocks: merged,
+      blocks: [...merged.values()].sort((left, right) => left.startMs - right.startMs),
       createdAt: existing?.createdAt ?? this.now(),
       updatedAt: this.now(),
     };

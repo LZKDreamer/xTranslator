@@ -52,6 +52,30 @@ describe("TextTranslationService", () => {
     expect(run).toEqual({ ok: true, translations: { c1: "译：c1", c2: "译：c2" }, missingIds: [] });
   });
 
+  it("skips Chinese comments when the target is either Chinese script", async () => {
+    let calls = 0;
+    const adapter = makeAdapter(async () => {
+      calls += 1;
+      return { ok: true, text: "" };
+    });
+
+    const run = await new TextTranslationService().translate(
+      [
+        { id: "simplified", sourceText: "这是简体中文。" },
+        { id: "traditional", sourceText: "這是繁體中文。" },
+      ],
+      context(adapter),
+    );
+
+    expect(run).toEqual({
+      ok: true,
+      translations: {},
+      missingIds: [],
+      skippedIds: ["simplified", "traditional"],
+    });
+    expect(calls).toBe(0);
+  });
+
   it("reports ids the model failed to answer", async () => {
     const adapter = makeAdapter(async (req) => {
       const ids = idsFromPrompt(req.userPrompt);

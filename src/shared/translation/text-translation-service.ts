@@ -14,6 +14,7 @@ import { TranslationResultValidator } from "./result-validator";
 import { buildTextSystemPrompt, buildTextUserPrompt } from "./text-prompt";
 import { batchTextItems } from "./text-batch";
 import type { TextTranslationItem } from "./translation-types";
+import { shouldTranslateText } from "../locale/translation-needed";
 
 const MAX_OUTPUT_FACTOR = 512;
 // Free-text requests are small (a viewport of comments or a selection). Do not
@@ -32,7 +33,7 @@ export interface TextTranslationContext {
 }
 
 export type TextTranslationRun =
-  | { ok: true; translations: Record<string, string>; missingIds: string[]; errorMessage?: string }
+  | { ok: true; translations: Record<string, string>; missingIds: string[]; skippedIds?: string[]; errorMessage?: string }
   | { ok: false; errorMessage: string };
 
 export class TextTranslationService {
@@ -42,12 +43,20 @@ export class TextTranslationService {
     items: readonly TextTranslationItem[],
     context: TextTranslationContext,
   ): Promise<TextTranslationRun> {
+    const skippedIds = items
+      .filter((item) => !shouldTranslateText(item.sourceText, context.targetLanguage))
+      .map((item) => item.id);
+    const translatableItems = items.filter((item) => !skippedIds.includes(item.id));
+    if (translatableItems.length === 0) {
+      return { ok: true, translations: {}, missingIds: [], skippedIds };
+    }
+
     // A comment's stable DOM id is used to place the response back on screen.
     // Some providers can return a valid id paired with another batch item's
     // text; keep comments to one item per request so that mismatch is impossible.
     const batches = context.singleItemBatches
-      ? items.map((item) => [item])
-      : batchTextItems(items, context.adapter.preset.contextWindowTokens);
+      ? translatableItems.map((item) => [item])
+      : batchTextItems(translatableItems, context.adapter.preset.contextWindowTokens);
 
     const translations: Record<string, string> = {};
     const missingIds: string[] = [];
@@ -71,6 +80,7 @@ export class TextTranslationService {
           ok: true,
           translations,
           missingIds: [...new Set([...missingIds, ...unprocessedIds])],
+          ...(skippedIds.length > 0 ? { skippedIds } : {}),
           errorMessage: run.errorMessage,
         };
       }
@@ -84,7 +94,12 @@ export class TextTranslationService {
       }
     }
 
-    return { ok: true, translations, missingIds };
+    return {
+      ok: true,
+      translations,
+      missingIds,
+      ...(skippedIds.length > 0 ? { skippedIds } : {}),
+    };
   }
 
   private async translateBatch(

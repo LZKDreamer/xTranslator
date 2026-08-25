@@ -1,6 +1,6 @@
 import type { TranslationSourceSegment } from "./translation-types";
 
-const CAPTION_MARKER_WORDS = /(?:^|\s)(?:music|song|applause|laugh(?:s|ter)?|laughter|sigh(?:s|ing)?|cry(?:ing)?|breath(?:ing)?|noise|sound effects?|inaudible|indistinct|unintelligible|speaking (?:foreign )?language|cheering|crowd|clapping|door|phone ringing|音乐|掌声|笑声|叹气|哭声|呼吸声|噪音|听不清|无法辨认)(?:$|\s)/iu;
+const CAPTION_MARKER_WORDS = /^(?:music|song|applause|laugh(?:s|ter)?|laughter|sigh(?:s|ing)?|cry(?:ing)?|breath(?:ing)?|noise|sound effects?|inaudible|indistinct|unintelligible|speaking (?:foreign )?language|cheering|crowd|clapping|door|phone ringing|snorts?|cough(?:s|ing)?|sneez(?:e|ing)|musik|música|musica|musique|tepuk tangan|lonceng|musik bermain|音楽|拍手|笑い|咳払い|咳|鈴|鐘|音效|音乐|掌声|笑声|叹气|哭声|呼吸声|噪音|听不清|无法辨认|음악|박수|웃음|기침|숨소리)(?:\s+(?:playing|plays|sounds?|only|continues|再生中|중))?$/iu;
 const CAPTION_MARKER_SYMBOLS = /^(?:[♪♫]+|[-–—_*]+)$/u;
 const SPEAKER_PREFIX = /^\s*>>\s*/gmu;
 const SENTENCE_BOUNDARY = /[.!?。！？…]+["'”’」』）)\]}]*/gu;
@@ -8,7 +8,7 @@ const CJK_CHARACTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{S
 
 function isCaptionMarker(value: string): boolean {
   const normalized = value.replace(/\s+/gu, " ").trim();
-  return normalized.length === 0 || CAPTION_MARKER_SYMBOLS.test(normalized) || CAPTION_MARKER_WORDS.test(` ${normalized} `);
+  return normalized.length === 0 || CAPTION_MARKER_SYMBOLS.test(normalized) || CAPTION_MARKER_WORDS.test(normalized);
 }
 
 /** Remove caption-only annotations without deleting ordinary spoken parentheses. */
@@ -26,6 +26,12 @@ export function cleanCaptionText(text: string): string {
     })
     .replace(/\s+/gu, " ")
     .trim();
+
+  // Some JSON3 tracks emit a non-verbal cue without brackets (for example
+  // "musik"), so do not send a standalone localized marker to the LLM as speech.
+  if (isCaptionMarker(normalized)) {
+    return "";
+  }
 
   // A caption containing only punctuation or symbols is not spoken content.
   // Dropping it here prevents standalone "..." / music-note cues from becoming

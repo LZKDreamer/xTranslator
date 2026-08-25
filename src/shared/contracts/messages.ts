@@ -4,6 +4,7 @@ import { parseCaptionDisplayMode } from "./settings";
 
 export const MESSAGE_TYPE = {
   getSettings: "get-settings",
+  getVideoTranslationCache: "get-video-translation-cache",
   getVideoTranslationStatus: "get-video-translation-status",
   updateVideoTranslationStatus: "update-video-translation-status",
   translateVideo: "translate-video",
@@ -19,6 +20,24 @@ export interface GetSettingsMessage {
   type: typeof MESSAGE_TYPE.getSettings;
 }
 
+export interface GetVideoTranslationCacheMessage {
+  type: typeof MESSAGE_TYPE.getVideoTranslationCache;
+  videoId: string;
+}
+
+export type VideoTranslationCacheResponse =
+  | {
+      found: true;
+      videoId: string;
+      videoTitle: string;
+      sourceTrackFingerprint: string;
+      sourceLanguage: string;
+      targetLanguage: string;
+      displayMode: CaptionDisplayMode;
+      blocks: TranslatedBlock[];
+    }
+  | { found: false };
+
 export type TranslationPhase = "idle" | "reading-captions" | "ready-for-translation" | "translating" | "translated" | "error";
 
 export interface VideoTranslationStatus {
@@ -32,6 +51,7 @@ export interface VideoTranslationStatus {
 
 export interface GetVideoTranslationStatusMessage {
   type: typeof MESSAGE_TYPE.getVideoTranslationStatus;
+  tabId?: number;
 }
 
 export interface UpdateVideoTranslationStatusMessage {
@@ -57,6 +77,7 @@ export type TranslateVideoResponse =
       displayMode: CaptionDisplayMode;
       fromCache: boolean;
       missingIds: string[];
+      skipped?: boolean;
     }
   | {
       ok: false;
@@ -83,6 +104,7 @@ export type TranslateTextResponse =
       translations: Record<string, string>;
       missingIds: string[];
       targetLanguage: string;
+      skippedIds?: string[];
       errorMessage?: string;
     }
   | { ok: false; errorMessage: string };
@@ -129,6 +151,7 @@ export interface ClearAllCacheMessage {
 
 export type ExtensionMessage =
   | GetSettingsMessage
+  | GetVideoTranslationCacheMessage
   | GetVideoTranslationStatusMessage
   | UpdateVideoTranslationStatusMessage
   | TranslateVideoMessage
@@ -314,8 +337,18 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
   switch (value.type) {
     case MESSAGE_TYPE.getSettings:
       return { type: MESSAGE_TYPE.getSettings };
+    case MESSAGE_TYPE.getVideoTranslationCache:
+      return typeof value.videoId === "string" && value.videoId.length > 0
+        ? { type: MESSAGE_TYPE.getVideoTranslationCache, videoId: value.videoId }
+        : null;
     case MESSAGE_TYPE.getVideoTranslationStatus:
-      return { type: MESSAGE_TYPE.getVideoTranslationStatus };
+      return value.tabId === undefined ||
+        (typeof value.tabId === "number" && Number.isSafeInteger(value.tabId) && value.tabId >= 0)
+        ? {
+            type: MESSAGE_TYPE.getVideoTranslationStatus,
+            ...(typeof value.tabId === "number" ? { tabId: value.tabId } : {}),
+          }
+        : null;
     case MESSAGE_TYPE.getCacheStats:
       return { type: MESSAGE_TYPE.getCacheStats };
     case MESSAGE_TYPE.listCache:
@@ -407,6 +440,8 @@ export function isTranslateTextResponse(value: unknown): value is TranslateTextR
     return (
       isRecord(value.translations) &&
       Object.entries(value.translations).every(([key, text]) => key.length > 0 && typeof text === "string") &&
+      (value.skippedIds === undefined ||
+        (Array.isArray(value.skippedIds) && value.skippedIds.every((id) => typeof id === "string"))) &&
       (value.errorMessage === undefined || typeof value.errorMessage === "string")
     );
   }
@@ -443,6 +478,7 @@ export function isTranslateVideoResponse(value: unknown): value is TranslateVide
       typeof value.targetLanguage === "string" &&
       parseCaptionDisplayMode(value.displayMode) !== null &&
       typeof value.fromCache === "boolean" &&
+      (value.skipped === undefined || typeof value.skipped === "boolean") &&
       Array.isArray(value.missingIds) &&
       value.missingIds.every((id) => typeof id === "string") &&
       Array.isArray(value.blocks) &&
@@ -465,6 +501,26 @@ export function isTranslateVideoResponse(value: unknown): value is TranslateVide
     value.partial.missingIds.every((id) => typeof id === "string") &&
     Array.isArray(value.partial.blocks) &&
     value.partial.blocks.every((entry) => parseTranslatedBlock(entry, true) !== null)
+  );
+}
+
+export function isVideoTranslationCacheResponse(value: unknown): value is VideoTranslationCacheResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.found === false) {
+    return true;
+  }
+  return (
+    value.found === true &&
+    typeof value.videoId === "string" &&
+    typeof value.videoTitle === "string" &&
+    typeof value.sourceTrackFingerprint === "string" &&
+    typeof value.sourceLanguage === "string" &&
+    typeof value.targetLanguage === "string" &&
+    parseCaptionDisplayMode(value.displayMode) !== null &&
+    Array.isArray(value.blocks) &&
+    value.blocks.every((entry) => parseTranslatedBlock(entry, true) !== null)
   );
 }
 

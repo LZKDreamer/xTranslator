@@ -150,13 +150,13 @@ export function parseInitialPlayerResponse(scriptTexts: Iterable<string>): YouTu
 
     const json = extractBalancedJson(scriptText, assignment.index + assignment[0].length);
     if (!json) {
-      return null;
+      continue;
     }
 
     try {
       return parseYouTubePlayerResponse(JSON.parse(json) as unknown);
     } catch {
-      return null;
+      continue;
     }
   }
 

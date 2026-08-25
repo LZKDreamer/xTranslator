@@ -73,7 +73,9 @@ function updateVideoTranslationStatus(status: VideoTranslationStatus): void {
       panel.dataset.state = "loading";
       break;
     case "translated":
-      detail.textContent = `翻译完成 · ${status.translatedCount ?? 0}/${status.segmentCount ?? 0} 处字幕`;
+      detail.textContent = status.segmentCount === 0
+        ? "当前字幕已是目标语言，无需翻译。"
+        : `翻译完成 · ${status.translatedCount ?? 0}/${status.segmentCount ?? 0} 处字幕`;
       panel.dataset.state = "success";
       break;
     case "error":
@@ -98,7 +100,12 @@ async function loadConfig(): Promise<void> {
 
 async function loadVideoTranslationStatus(): Promise<void> {
   try {
-    const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPE.getVideoTranslationStatus });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs[0]?.id;
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPE.getVideoTranslationStatus,
+      ...(typeof tabId === "number" ? { tabId } : {}),
+    });
     if (!isVideoTranslationStatus(response)) {
       throw new Error("Invalid video translation status.");
     }

@@ -17,6 +17,8 @@ function segment(id: string, sourceText: string, startMs: number, durationMs = 1
 describe("token estimator", () => {
   it("estimates CJK at about one token per character and Latin at about a quarter", () => {
     expect(estimateTokens("你好世界")).toBe(4);
+    expect(estimateTokens("こんにちは世界")).toBe(7);
+    expect(estimateTokens("안녕하세요")).toBe(5);
     const english = estimateTokens("hello world");
     expect(english).toBeGreaterThanOrEqual(2);
     expect(english).toBeLessThan(4);
@@ -41,6 +43,18 @@ describe("buildTranslationBlocks", () => {
       computeInputTokenBudget(65_536),
     );
     expect(blocks[0]!.sourceText).toBe("你好世界！");
+  });
+
+  it("restores spaces between adjacent Korean caption events", () => {
+    const blocks = buildTranslationBlocks(
+      [segment("a", "오늘은", 0), segment("b", "메이크업 영상을", 1000)],
+      computeInputTokenBudget(65_536),
+      undefined,
+      undefined,
+      undefined,
+      "ko",
+    );
+    expect(blocks[0]!.sourceText).toBe("오늘은 메이크업 영상을");
   });
 
   it("splits blocks at a large timeline gap", () => {
@@ -72,6 +86,11 @@ describe("buildTranslationBlocks", () => {
     expect(cleanCaptionText(">> hello [music] (sighs)")).toBe("hello");
     expect(cleanCaptionText("This is (probably) [music]")).toBe("This is (probably)");
     expect(cleanCaptionText("你好[音乐]")).toBe("你好");
+    expect(cleanCaptionText("musik")).toBe("");
+    expect(cleanCaptionText("[musik] Kunjungan")).toBe("Kunjungan");
+    expect(cleanCaptionText("[音楽]")).toBe("");
+    expect(cleanCaptionText("[咳払い]")).toBe("");
+    expect(cleanCaptionText("[snorts]")).toBe("");
     expect(cleanCaptionText("…")).toBe("");
     expect(cleanTranslatedCaptionText("这是 Google 的产品。", "zh-Hans")).toBe("这是 Google 的产品。");
     expect(cleanTranslatedCaptionText("What's new?", "en")).toBe("What's new?");
@@ -86,6 +105,35 @@ describe("buildTranslationBlocks", () => {
     expect(blocks.map((block) => block.sourceText)).toEqual(["First sentence.", "Second sentence!"]);
     expect(blocks[0]!.endMs).toBeLessThanOrEqual(blocks[1]!.startMs);
     expect(blocks[1]!.endMs).toBe(2000);
+  });
+
+  it("preserves source order when a split fragment shares a start time with the next cue", () => {
+    const blocks = buildTranslationBlocks(
+      [segment("a", "First. tail", 0, 1000), segment("b", "next", 750, 100)],
+      computeInputTokenBudget(65_536),
+    );
+
+    expect(blocks.map((block) => block.sourceText)).toEqual(["First.", "tail next"]);
+  });
+
+  it("does not let an overlapping non-verbal cue split surrounding speech", () => {
+    const blocks = buildTranslationBlocks(
+      [segment("a", "before", 0, 1000), segment("m", "[music]", 900, 1000), segment("b", "after", 1000, 1000)],
+      computeInputTokenBudget(65_536),
+    );
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ sourceText: "before after", segmentIds: ["a", "m", "b"] });
+  });
+
+  it("merges a short punctuationless continuation instead of leaving an orphan tail", () => {
+    const blocks = buildTranslationBlocks(
+      [segment("a", "The sentence is incomplete", 0, 3000), segment("b", "at the end.", 3000, 1000)],
+      computeInputTokenBudget(65_536),
+    );
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.sourceText).toBe("The sentence is incomplete at the end.");
   });
 
   it("breaks at a new speaker and clamps overlapping block timing", () => {
@@ -119,13 +167,27 @@ describe("buildTranslationBlocks", () => {
     }
   });
 
-  it("limits a continuous block to a readable six-second timing window", () => {
-    const segments = Array.from({ length: 7 }, (_, index) => segment(String(index), "word", index * 1000));
+  it("allows a punctuationless sentence to cross raw ASR cue boundaries but still caps it", () => {
+    const segments = Array.from({ length: 17 }, (_, index) => segment(String(index), "word", index * 1000));
     const blocks = buildTranslationBlocks(segments, computeInputTokenBudget(65_536));
 
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 6000 });
-    expect(blocks[1]).toMatchObject({ startMs: 6000, endMs: 7000 });
+    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 16000 });
+    expect(blocks[1]).toMatchObject({ startMs: 16000, endMs: 17000 });
+  });
+
+  it("uses the next JSON3 cue as the grouping end when raw durations overlap", () => {
+    const blocks = buildTranslationBlocks(
+      [
+        segment("a", "昨夜羽田空港", 0, 8000),
+        segment("b", "近くの沖合いで", 4000, 8000),
+        segment("c", "事故がありました", 8000, 2000),
+      ],
+      computeInputTokenBudget(65_536),
+    );
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 10000, segmentIds: ["a", "b", "c"] });
   });
 
   it("keeps ordinary English caption blocks within the two-line source budget", () => {
@@ -215,6 +277,9 @@ describe("buildTranslationBlocks", () => {
 describe("containsSpokenContent", () => {
   it("returns false for caption-only markers and true for real text", () => {
     expect(containsSpokenContent("[music]")).toBe(false);
+    expect(containsSpokenContent("[musik]")).toBe(false);
+    expect(containsSpokenContent("musik")).toBe(false);
+    expect(containsSpokenContent("[音楽]")).toBe(false);
     expect(containsSpokenContent("♪ ♫")).toBe(false);
     expect(containsSpokenContent("hello[music]world")).toBe(true);
   });

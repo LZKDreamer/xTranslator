@@ -27,6 +27,7 @@ describe("translation prompt", () => {
     expect(system).toContain("preserve natural sentence punctuation");
     expect(system).toContain("empty spoken fillers");
     expect(system).toContain("at most two natural lines");
+    expect(system).toContain("raw cue boundaries as timing hints");
   });
 
   it("numbers blocks and escapes newlines in the user prompt", () => {

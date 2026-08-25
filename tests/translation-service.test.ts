@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { VideoTranslationService } from "../src/background/translation-service";
 import { buildTranslationBlocks } from "../src/shared/translation/block-builder";
-import { PROMPT_VERSION } from "../src/shared/translation/prompt";
 import { getProviderPreset } from "../src/shared/providers/provider-registry";
 import type { CompletionRequest, CompletionResult, ProviderAdapter, ProviderPreset } from "../src/shared/providers/provider-types";
 import type { TranslateVideoMessage } from "../src/shared/contracts/messages";
 import type { VideoTranslationCache, VideoCacheStats } from "../src/shared/storage/video-translation-cache";
 import { buildVideoCacheKey } from "../src/shared/storage/video-translation-cache";
-import type { TranslationSourceSegment } from "../src/shared/translation/translation-types";
+import type { TranslatedBlock, TranslationBlockInput, TranslationSourceSegment, VideoTranslationCacheEntry } from "../src/shared/translation/translation-types";
 
 function makeRequest(segments: TranslationSourceSegment[], videoId = "v1"): TranslateVideoMessage {
   return {
@@ -36,26 +35,15 @@ function line(id: string, text: string): string {
 }
 
 class MemoryCache implements VideoTranslationCache {
-  public readonly entries = new Map<string, {
-    key: string;
-    videoId: string;
-    videoTitle: string;
-    sourceTrackFingerprint: string;
-    sourceLanguage: string;
-    targetLanguage: string;
-    promptVersion: string;
-    blocks: Record<string, string>;
-    createdAt: number;
-    updatedAt: number;
-  }>();
+  public readonly entries = new Map<string, VideoTranslationCacheEntry>();
 
-  public async get(key: string) {
+  public async get(key: string): Promise<VideoTranslationCacheEntry | null> {
     return this.entries.get(key) ?? null;
   }
-  public async put(entry: { key: string; videoId: string; videoTitle: string; sourceTrackFingerprint: string; sourceLanguage: string; targetLanguage: string; promptVersion: string; blocks: Record<string, string>; createdAt: number; updatedAt: number }) {
+  public async put(entry: VideoTranslationCacheEntry): Promise<void> {
     this.entries.set(entry.key, entry);
   }
-  public async list() {
+  public async list(): Promise<VideoTranslationCacheEntry[]> {
     return Array.from(this.entries.values());
   }
   public async deleteByVideoId(): Promise<void> {
@@ -94,7 +82,18 @@ function context(adapter: ProviderAdapter) {
 }
 
 function cacheKey(videoId = "v1"): string {
-  return buildVideoCacheKey({ videoId, sourceTrackFingerprint: "fp", sourceLanguage: "en", targetLanguage: "zh-Hans" });
+  return buildVideoCacheKey({ videoId });
+}
+
+function cachedBlock(block: TranslationBlockInput, translatedText: string): TranslatedBlock {
+  return {
+    id: block.id,
+    segmentIds: [...block.segmentIds],
+    startMs: block.startMs,
+    endMs: block.endMs,
+    sourceText: block.sourceText,
+    translatedText,
+  };
 }
 
 function idsFromPrompt(prompt: string): string[] {
@@ -113,8 +112,7 @@ describe("VideoTranslationService", () => {
       sourceTrackFingerprint: "fp",
       sourceLanguage: "en",
       targetLanguage: "zh-Hans",
-      promptVersion: PROMPT_VERSION,
-      blocks: { [blocks[0]!.id]: "CACHED" },
+      blocks: [cachedBlock(blocks[0]!, "CACHED")],
       createdAt: 1,
       updatedAt: 1,
     });
@@ -145,6 +143,94 @@ describe("VideoTranslationService", () => {
     expect(calls).toBe(0);
   });
 
+  it("does not call a provider when Chinese source and target scripts are equivalent", async () => {
+    let calls = 0;
+    const adapter = makeAdapter(async () => {
+      calls += 1;
+      return { ok: true, text: "" };
+    });
+
+    const result = await new VideoTranslationService(new MemoryCache()).translate(
+      { ...makeRequest(adjacentSegments), sourceLanguage: "zh-Hant" },
+      { ...context(adapter), sourceLanguage: "zh-Hant", targetLanguage: "zh-Hans" },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      blocks: [],
+      targetLanguage: "zh-Hans",
+      displayMode: "bilingual",
+      fromCache: true,
+      missingIds: [],
+      skipped: true,
+    });
+    expect(calls).toBe(0);
+  });
+
+  it("reads the same video cache regardless of the active provider or model", async () => {
+    const cache = new MemoryCache();
+    const blocks = buildTranslationBlocks(adjacentSegments, preset.contextWindowTokens);
+    const key = cacheKey();
+    cache.entries.set(key, {
+      key,
+      videoId: "v1",
+      videoTitle: "Demo video",
+      sourceTrackFingerprint: "fp",
+      sourceLanguage: "en",
+      targetLanguage: "zh-Hans",
+      blocks: [cachedBlock(blocks[0]!, "Agnes cached")],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    let calls = 0;
+    const adapter = makeAdapter(async (req) => {
+      calls += 1;
+      return { ok: true, text: idsFromPrompt(req.userPrompt).map((id) => line(id, "DeepSeek result")).join("\n") };
+    });
+    const result = await new VideoTranslationService(cache).translate(makeRequest(adjacentSegments), context(adapter));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.fromCache).toBe(true);
+      expect(result.blocks[0]?.translatedText).toBe("Agnes cached");
+    }
+    expect(calls).toBe(0);
+  });
+
+  it("does not reuse a cache entry from another caption track", async () => {
+    const cache = new MemoryCache();
+    const blocks = buildTranslationBlocks(adjacentSegments, preset.contextWindowTokens);
+    const key = cacheKey();
+    cache.entries.set(key, {
+      key,
+      videoId: "v1",
+      videoTitle: "Demo video",
+      sourceTrackFingerprint: "old-track",
+      sourceLanguage: "en",
+      targetLanguage: "zh-Hans",
+      blocks: [cachedBlock(blocks[0]!, "WRONG TRACK")],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    let calls = 0;
+    const adapter = makeAdapter(async (req) => {
+      calls += 1;
+      return { ok: true, text: idsFromPrompt(req.userPrompt).map((id) => line(id, "FRESH")).join("\n") };
+    });
+
+    const result = await new VideoTranslationService(cache).translate(makeRequest(adjacentSegments), context(adapter));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.blocks[0]?.translatedText).toBe("FRESH");
+      expect(result.fromCache).toBe(false);
+    }
+    expect(calls).toBe(1);
+    expect(cache.entries.get(key)?.sourceTrackFingerprint).toBe("fp");
+  });
+
   it("translates uncached blocks and writes progress to the cache", async () => {
     const cache = new MemoryCache();
     const adapter = makeAdapter(async (req) => {
@@ -164,7 +250,7 @@ describe("VideoTranslationService", () => {
     }
     const entry = cache.entries.get(cacheKey());
     expect(entry?.videoTitle).toBe("Demo video");
-    expect(Object.keys(entry?.blocks ?? {}).length).toBe(1);
+    expect(entry?.blocks).toHaveLength(1);
   });
 
   it("preserves natural punctuation in Chinese subtitle output before caching and display", async () => {
@@ -253,8 +339,7 @@ describe("VideoTranslationService", () => {
       sourceTrackFingerprint: "fp",
       sourceLanguage: "en",
       targetLanguage: "zh-Hans",
-      promptVersion: PROMPT_VERSION,
-      blocks: { [blocks[0]!.id]: "", [blocks[1]!.id]: "CACHED" },
+      blocks: [cachedBlock(blocks[0]!, ""), cachedBlock(blocks[1]!, "CACHED")],
       createdAt: 1,
       updatedAt: 1,
     });
@@ -328,7 +413,9 @@ describe("VideoTranslationService", () => {
       expect(result.partial?.missingIds).toEqual([blocks[1]!.id]);
       expect(result.partial?.blocks.map((block) => block.translatedText)).toEqual(["已完成", ""]);
     }
-    expect(cache.entries.get(cacheKey())?.blocks).toEqual({ [blocks[0]!.id]: "已完成" });
+    expect(cache.entries.get(cacheKey())?.blocks).toEqual([
+      expect.objectContaining({ id: blocks[0]!.id, translatedText: "已完成" }),
+    ]);
   });
 
   it("caps subtitle output at a provider's documented output limit", async () => {
