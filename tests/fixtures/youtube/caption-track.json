@@ -1,0 +1,7 @@
+{
+  "wireMagic": "pb3",
+  "events": [
+    { "tStartMs": 0, "dDurationMs": 1500, "segs": [{ "utf8": "Sanitized JSON fixture segment." }] },
+    { "tStartMs": 1500, "dDurationMs": 500, "segs": [{ "utf8": "Second JSON segment." }] }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "events": [
+    { "tStartMs": 0, "dDurationMs": 1500, "segs": [{ "utf8": "Sanitized ", "tOffsetMs": 0 }, { "utf8": "JSON3 segment.", "tOffsetMs": "700" }] },
+    { "tStartMs": 1500, "dDurationMs": 500, "segs": [{ "utf8": "Second JSON3 segment." }] }
+  ]
+}

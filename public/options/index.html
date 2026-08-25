@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>xTranslator 偏好设置</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+  <body>
+    <main class="options-shell" aria-labelledby="options-title">
+      <header class="options-header">
+        <img class="brand-mark" src="../icons/icon-48.png" alt="" width="48" height="48" />
+        <div>
+          <h1 id="options-title"><span>x</span>Translator</h1>
+          <p>偏好设置</p>
+        </div>
+      </header>
+      <form id="settings-form" class="options-form">
+        <section class="settings-panel" aria-labelledby="provider-title">
+          <h2 id="provider-title">翻译服务</h2>
+          <p class="help">选择你常用的翻译服务，修改后会自动保存。</p>
+          <label for="provider-id">翻译服务</label>
+          <select id="provider-id" name="provider-id"></select>
+          <label for="api-key">服务密钥（API Key）</label>
+          <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="api-key-help" />
+          <p id="api-key-help" class="help">密钥只保存在本机，用于连接你选择的翻译服务。</p>
+          <label for="model">翻译模型</label>
+          <select id="model" name="model"></select>
+          <p id="model-status" class="status-message" role="status"></p>
+        </section>
+
+        <section class="settings-panel" aria-labelledby="subtitles-title">
+          <h2 id="subtitles-title">字幕显示</h2>
+          <label for="caption-mode">字幕模式</label>
+          <select id="caption-mode" name="caption-mode">
+            <option value="original">仅显示原文</option>
+            <option value="translation">仅显示译文</option>
+            <option value="bilingual" selected>原文 + 译文</option>
+          </select>
+          <p class="help">选择视频中的字幕呈现方式，保存后会立即应用到正在播放的视频。</p>
+        </section>
+
+        <section class="settings-panel" aria-labelledby="selection-title">
+          <h2 id="selection-title">划词翻译</h2>
+          <label class="checkbox-row" for="selection-enabled">
+            <input id="selection-enabled" name="selection-enabled" type="checkbox" checked />
+            <span>启用划词翻译</span>
+          </label>
+          <p class="help">关闭后，选中文字不会显示翻译浮层，右键菜单也不会触发划词翻译。</p>
+          <label class="checkbox-row" for="include-context">
+            <input id="include-context" name="include-context" type="checkbox" />
+            <span>翻译选中文本时参考前后文</span>
+          </label>
+          <p class="help">开启后会结合前后句，让翻译更贴合语境。</p>
+        </section>
+
+        <section class="settings-panel" aria-labelledby="cache-title">
+          <h2 id="cache-title">翻译记录</h2>
+          <p id="cache-stats" class="help" aria-live="polite"></p>
+          <ul id="cache-list" class="cache-list"></ul>
+          <p id="cache-empty" class="status-message">还没有保存的翻译记录。</p>
+          <div class="actions">
+            <button class="secondary-button" id="refresh-cache" type="button">重新加载</button>
+            <button class="secondary-button" id="clear-all-cache" type="button">清空记录</button>
+          </div>
+        </section>
+
+      </form>
+    </main>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+    <script src="./index.js"></script>
+  </body>
+</html>

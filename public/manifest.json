@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "xTranslator",
+  "description": "让 YouTube 字幕翻译更自然，也支持使用你自己的翻译服务。",
+  "version": "0.1.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "xTranslator",
+    "default_popup": "popup/index.html"
+  },
+  "background": {
+    "service_worker": "background/index.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content/index.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content/main-world-bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon-32.png", "icons/icon-light-32.png"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ],
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://api.deepseek.com/*",
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://apihub.agnes-ai.com/*",
+    "https://opencode.ai/*"
+  ],
+  "options_page": "options/index.html"
+}

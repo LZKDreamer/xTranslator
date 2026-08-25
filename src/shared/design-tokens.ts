@@ -1,0 +1,21 @@
+export const DESIGN_TOKEN = {
+  color: {
+    accentCyan: "#33d6ff",
+    accentViolet: "#7865ff",
+    accentMix: "#5c9bff",
+    textOnDark: "#f5f7ff",
+    textPrimary: "#1d1d1f",
+    textSecondary: "#6e6e73",
+    surfaceGlassDark: "rgba(19, 22, 33, 0.72)",
+    surfaceGlassDarkStrong: "rgba(19, 22, 33, 0.88)",
+    surfaceGlassLight: "rgba(255, 255, 255, 0.48)",
+    surfaceGlassLightStrong: "rgba(255, 255, 255, 0.68)",
+    borderGlassDark: "rgba(255, 255, 255, 0.18)",
+    borderGlassLight: "rgba(255, 255, 255, 0.62)",
+    danger: "#c0362c",
+  },
+  radius: { control: "10px", panel: "16px" },
+  shadow: { float: "0 12px 32px rgba(0, 0, 0, 0.28)" },
+  blur: { glass: "24px" },
+  duration: { fast: "160ms", normal: "220ms" },
+} as const;

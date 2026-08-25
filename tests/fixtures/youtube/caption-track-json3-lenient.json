@@ -1,0 +1,8 @@
+{
+  "events": [
+    { "tStartMs": 0, "dDurationMs": 1500, "segs": [{ "utf8": "First real segment." }] },
+    { "foo": "bar" },
+    { "tStartMs": "1500", "dDurationMs": "500", "segs": [{ "utf8": "Second segment with string timings." }] },
+    { "tStartMs": 2000, "dDurationMs": 100, "aAppend": true }
+  ]
+}
