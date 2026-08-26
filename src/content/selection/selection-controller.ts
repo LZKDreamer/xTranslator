@@ -11,6 +11,7 @@ import { isSettingsMessageResponse, isTranslateTextResponse, MESSAGE_TYPE } from
 import { Check, CircleAlert, Copy, createElement, LoaderCircle, MousePointer2, X } from "../../shared/icons";
 import { extractSentenceContext } from "../../shared/selection/selection-context";
 import { XTRANSLATOR_DOM } from "../../shared/youtube/youtube-page-contract";
+import { t } from "../../shared/i18n";
 
 const PILL_CLASS = "xtranslator-selection-pill";
 const RESULT_CLASS = "xtranslator-selection-result";
@@ -153,21 +154,21 @@ export class SelectionController {
     pill.className = PILL_CLASS;
     pill.setAttribute(XTRANSLATOR_DOM.mountAttribute, MOUNT_SELECTION);
     pill.setAttribute("role", "toolbar");
-    pill.setAttribute("aria-label", "划词翻译");
+    pill.setAttribute("aria-label", t("selection.toolbar"));
 
     const translate = this.documentNode.createElement("button");
     translate.className = "xtranslator-selection-action xtranslator-selection-primary";
     translate.type = "button";
     translate.dataset.action = "translate";
-    translate.setAttribute("aria-label", "翻译所选文本");
-    translate.append(createElement(MousePointer2), this.documentNode.createTextNode("翻译"));
+    translate.setAttribute("aria-label", t("selection.translateAria"));
+    translate.append(createElement(MousePointer2), this.documentNode.createTextNode(t("selection.translate")));
     translate.addEventListener("click", () => void this.translateCurrentSelection());
 
     const copy = this.documentNode.createElement("button");
     copy.className = "xtranslator-selection-action";
     copy.type = "button";
     copy.dataset.action = "copy";
-    copy.setAttribute("aria-label", "复制所选文本");
+    copy.setAttribute("aria-label", t("selection.copyAria"));
     copy.append(createElement(Copy));
     copy.addEventListener("click", () => this.copySelection());
 
@@ -175,7 +176,7 @@ export class SelectionController {
     close.className = "xtranslator-selection-action";
     close.type = "button";
     close.dataset.action = "close";
-    close.setAttribute("aria-label", "关闭划词浮层");
+    close.setAttribute("aria-label", t("selection.closeAria"));
     close.append(createElement(X));
     close.addEventListener("click", () => this.hidePill());
 
@@ -283,7 +284,7 @@ export class SelectionController {
     // two overlays stacked on the selection.
     this.pill?.remove();
     this.pill = null;
-    this.setResultState(result, "loading", "正在翻译…");
+    this.setResultState(result, "loading", t("selection.translating"));
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -309,7 +310,7 @@ export class SelectionController {
       if (runId !== this.translationRunId || this.result !== result || !result.isConnected) {
         return;
       }
-      this.setResultState(result, "error", "翻译失败，请重试。");
+      this.setResultState(result, "error", t("selection.failed"));
     }
   }
 
@@ -338,7 +339,7 @@ export class SelectionController {
     copy.className = "xtranslator-selection-action";
     copy.type = "button";
     copy.dataset.action = "copy-result";
-    copy.setAttribute("aria-label", "复制译文");
+    copy.setAttribute("aria-label", t("selection.copyTranslationAria"));
     copy.append(createElement(Copy));
     copy.addEventListener("click", () => void this.copyResultText(panel));
 
@@ -346,7 +347,7 @@ export class SelectionController {
     close.className = "xtranslator-selection-action";
     close.type = "button";
     close.dataset.action = "close-result";
-    close.setAttribute("aria-label", "取消翻译");
+    close.setAttribute("aria-label", t("selection.cancelAria"));
     close.append(createElement(X));
     close.addEventListener("click", () => this.closeResultPanel());
 
@@ -373,7 +374,7 @@ export class SelectionController {
   private setResultState(panel: HTMLElement, state: "loading" | "error" | "done", message: string): void {
     panel.dataset.state = state;
     const close = panel.querySelector<HTMLButtonElement>('[data-action="close-result"]');
-    close?.setAttribute("aria-label", state === "loading" ? "取消翻译" : "关闭译文面板");
+    close?.setAttribute("aria-label", state === "loading" ? t("selection.cancelAria") : t("selection.closeTranslationAria"));
     const content = panel.querySelector<HTMLElement>(".xtranslator-selection-result-text");
     if (content) {
       content.replaceChildren();
@@ -391,7 +392,7 @@ export class SelectionController {
 
   private setResultText(panel: HTMLElement, translated: string): void {
     panel.dataset.state = "done";
-    panel.querySelector<HTMLButtonElement>('[data-action="close-result"]')?.setAttribute("aria-label", "关闭译文面板");
+    panel.querySelector<HTMLButtonElement>('[data-action="close-result"]')?.setAttribute("aria-label", t("selection.closeTranslationAria"));
     const content = panel.querySelector<HTMLElement>(".xtranslator-selection-result-text");
     if (content) {
       content.replaceChildren();

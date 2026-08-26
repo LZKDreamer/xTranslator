@@ -25,6 +25,7 @@ import {
   type VideoTranslationRepository,
 } from "../shared/storage/video-translation-cache";
 import { VideoTranslationService, type BlockProgressWriter } from "./translation-service";
+import { t } from "../shared/i18n";
 
 const COMMENT_BATCH_CONCURRENCY = 3;
 
@@ -98,17 +99,17 @@ async function handleTranslateVideo(message: TranslateVideoMessage, tabId?: numb
 
   const apiKey = resolveProviderApiKey(settings).trim();
   if (!apiKey) {
-    return { ok: false, errorMessage: "尚未连接翻译服务，请先完成偏好设置。" };
+    return { ok: false, errorMessage: t("background.notConnected") };
   }
 
   const preset = getProviderPreset(settings.provider.providerId);
   if (!preset) {
-    return { ok: false, errorMessage: `暂时无法识别翻译服务：${settings.provider.providerId}` };
+    return { ok: false, errorMessage: t("background.unknownService", { id: settings.provider.providerId }) };
   }
 
   const model = settings.provider.model.trim();
   if (!model) {
-    return { ok: false, errorMessage: "尚未选择翻译模型，请先打开设置加载并选择模型。" };
+    return { ok: false, errorMessage: t("background.noModel") };
   }
   const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
 
@@ -171,17 +172,17 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
 
   const apiKey = resolveProviderApiKey(settings).trim();
   if (!apiKey) {
-    return { ok: false, errorMessage: "尚未连接翻译服务，请先完成偏好设置。" };
+    return { ok: false, errorMessage: t("background.notConnected") };
   }
 
   const preset = getProviderPreset(settings.provider.providerId);
   if (!preset) {
-    return { ok: false, errorMessage: `暂时无法识别翻译服务：${settings.provider.providerId}` };
+    return { ok: false, errorMessage: t("background.unknownService", { id: settings.provider.providerId }) };
   }
 
   const model = settings.provider.model.trim();
   if (!model) {
-    return { ok: false, errorMessage: "尚未选择翻译模型，请先打开设置加载并选择模型。" };
+    return { ok: false, errorMessage: t("background.noModel") };
   }
   const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
 
@@ -229,7 +230,7 @@ function createSelectionContextMenu(): Promise<void> {
     chrome.contextMenus.create(
       {
         id: CONTEXT_MENU_ID,
-        title: "翻译所选文本",
+        title: t("background.contextMenu"),
         contexts: ["selection"],
       },
       () => {
@@ -321,12 +322,12 @@ if (typeof chrome !== "undefined") {
       case "translate-video":
         void handleTranslateVideo(parsedMessage, sender.tab?.id)
           .then(sendResponse)
-          .catch(() => reportAsyncFailure(sendResponse, "视频翻译失败，请重试。"));
+          .catch(() => reportAsyncFailure(sendResponse, t("background.videoFailed")));
         return true;
       case "translate-text":
         void handleTranslateText(parsedMessage)
           .then(sendResponse)
-          .catch(() => reportAsyncFailure(sendResponse, "翻译失败，请重试。"));
+          .catch(() => reportAsyncFailure(sendResponse, t("background.translationFailed")));
         return true;
       case "get-cache-stats":
         void getVideoTranslationRepository()

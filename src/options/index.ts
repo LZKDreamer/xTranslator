@@ -13,6 +13,7 @@ import {
 } from "../shared/contracts/settings";
 import { createProviderAdapter, getProviderPreset, listProviderPresets } from "../shared/providers/provider-registry";
 import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
+import { getUiLocale, localizeDocument, t } from "../shared/i18n";
 
 function queryRequired<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -42,7 +43,7 @@ function formatBytes(bytes: number): string {
 }
 
 function formatDate(value: number): string {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString(getUiLocale());
 }
 
 function populateProviders(selectedId: string): void {
@@ -101,7 +102,7 @@ async function loadModels(
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
     loadModelsButton.disabled = true;
-    setTranslationStatus("暂时无法识别该翻译服务。", "error");
+    setTranslationStatus(t("options.unknownService"), "error");
     return "";
   }
 
@@ -113,7 +114,7 @@ async function loadModels(
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
     loadModelsButton.disabled = true;
-    setTranslationStatus("请填写 API Key 后加载模型。");
+    setTranslationStatus(t("options.enterApiKey"));
     return "";
   }
 
@@ -121,7 +122,7 @@ async function loadModels(
     return "";
   }
   loadModelsButton.disabled = true;
-  setTranslationStatus("正在查找可用模型…");
+  setTranslationStatus(t("options.findingModels"));
 
   try {
     const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
@@ -137,8 +138,8 @@ async function loadModels(
         modelLoadedForApiKey: normalizedApiKey,
       });
       setTranslationStatus(model
-        ? (normalizedApiKey ? `找到 ${result.models.length} 个可用模型。` : `找到 ${result.models.length} 个模型，请填写 API Key 后保存。`)
-        : "没有可用模型。", model ? "success" : "error");
+        ? (normalizedApiKey ? t("options.modelsFound", { count: result.models.length }) : t("options.modelsFoundEnterKey", { count: result.models.length }))
+        : t("options.noModels"), model ? "success" : "error");
       loadModelsButton.disabled = !normalizedApiKey;
       return model;
     } else {
@@ -150,7 +151,7 @@ async function loadModels(
     if (isCurrent()) {
       modelSelect.replaceChildren();
       modelSelect.disabled = true;
-      setTranslationStatus("模型列表暂时无法加载，请检查网络或服务密钥。", "error");
+      setTranslationStatus(t("options.modelsUnavailable"), "error");
     }
   } finally {
     if (isCurrent()) {
@@ -171,7 +172,7 @@ async function loadCacheList(): Promise<void> {
   } catch {
     listEl.replaceChildren();
     statsEl.textContent = "";
-    emptyEl.textContent = "翻译记录暂时无法加载。";
+    emptyEl.textContent = t("options.historyUnavailable");
     emptyEl.hidden = false;
     return;
   }
@@ -179,13 +180,13 @@ async function loadCacheList(): Promise<void> {
   if (!isListCacheResponse(response)) {
     listEl.replaceChildren();
     statsEl.textContent = "";
-    emptyEl.textContent = "翻译记录暂时无法加载。";
+    emptyEl.textContent = t("options.historyUnavailable");
     emptyEl.hidden = false;
     return;
   }
 
   listEl.replaceChildren();
-  statsEl.textContent = `已保存 ${response.entries.length} 条记录 · ${formatBytes(response.totalBytes)}`;
+  statsEl.textContent = t("options.historyStats", { count: response.entries.length, size: formatBytes(response.totalBytes) });
   emptyEl.hidden = response.entries.length > 0;
 
   for (const entry of response.entries) {
@@ -201,20 +202,25 @@ async function loadCacheList(): Promise<void> {
 
     const meta = document.createElement("p");
     meta.className = "cache-item-meta";
-    meta.textContent = `${entry.sourceLanguage}→${entry.targetLanguage} · ${entry.blockCount} 段 · ${formatDate(entry.updatedAt)}`;
+    meta.textContent = t("options.historyEntry", {
+      source: entry.sourceLanguage,
+      target: entry.targetLanguage,
+      count: entry.blockCount,
+      date: formatDate(entry.updatedAt),
+    });
 
     info.append(title, meta);
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "cache-delete";
-    deleteButton.textContent = "删除";
-    deleteButton.setAttribute("aria-label", `删除 ${entry.title} 的翻译记录`);
+    deleteButton.textContent = t("options.delete");
+    deleteButton.setAttribute("aria-label", t("options.deleteHistoryEntry", { title: entry.title }));
     deleteButton.addEventListener("click", () => {
       void chrome.runtime
         .sendMessage({ type: MESSAGE_TYPE.clearVideoCache, videoId: entry.videoId })
         .then(() => loadCacheList())
-        .catch(() => showToast("删除这条记录失败，请稍后再试。", "error"));
+        .catch(() => showToast(t("options.deleteFailed"), "error"));
     });
 
     item.append(info, deleteButton);
@@ -322,7 +328,7 @@ function scheduleSettingsSave(settings: ExtensionSettings, translationSave = fal
   pendingSettings = settings;
   pendingTranslationSave ||= translationSave;
   if (translationSave) {
-    setTranslationStatus("正在保存配置…");
+    setTranslationStatus(t("options.saving"));
   }
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer);
@@ -354,7 +360,7 @@ async function flushSettingsSave(): Promise<void> {
         draft.apiKey.trim() === settings.apiKeys[settings.provider.providerId] &&
         draft.model === settings.provider.model
       ) {
-        setTranslationStatus("配置已保存。", "success");
+        setTranslationStatus(t("options.saved"), "success");
       }
     }
     if (translationSave) {
@@ -367,9 +373,9 @@ async function flushSettingsSave(): Promise<void> {
     pendingSettings ??= settings;
     pendingTranslationSave ||= translationSave;
     if (translationSave) {
-      setTranslationStatus("配置保存失败，请稍后重试。", "error");
+      setTranslationStatus(t("options.saveFailed"), "error");
     } else {
-      showToast("偏好设置保存失败，请稍后重试。", "error");
+      showToast(t("options.preferencesSaveFailed"), "error");
     }
   } finally {
     inFlightSettings = null;
@@ -414,7 +420,7 @@ function commitTranslationService(): boolean {
   const currentApiKey = base.apiKeys[values.providerId] ?? "";
   const currentModel = resolveProviderModel(base, values.providerId);
   if (base.provider.providerId === values.providerId && currentApiKey === values.apiKey && currentModel === values.model) {
-    setTranslationStatus("配置已保存。", "success");
+    setTranslationStatus(t("options.saved"), "success");
     return true;
   }
   scheduleSettingsSave(next, true);
@@ -500,7 +506,7 @@ function bindForm(): void {
     });
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
-    setTranslationStatus(apiKeyInput.value.trim() ? "API Key 已变化，请点击“加载模型”。" : "请填写 API Key 后加载模型。");
+    setTranslationStatus(apiKeyInput.value.trim() ? t("options.apiKeyChanged") : t("options.enterApiKey"));
     updateLoadModelsButton();
   });
 
@@ -514,7 +520,7 @@ function bindForm(): void {
     modelSelect.replaceChildren();
     modelSelect.disabled = true;
     updateLoadModelsButton();
-    setTranslationStatus(draft.apiKey ? "正在加载已配置模型…" : "请填写 API Key 后加载模型。");
+    setTranslationStatus(draft.apiKey ? t("options.loadingConfiguredModels") : t("options.enterApiKey"));
     if (draft.apiKey && draft.model && draft.modelLoadedForApiKey === draft.apiKey) {
       void commitTranslationService();
     }
@@ -544,7 +550,7 @@ function bindForm(): void {
     void chrome.runtime
       .sendMessage({ type: MESSAGE_TYPE.clearAllCache })
       .then(() => loadCacheList())
-      .catch(() => showToast("清空翻译记录失败，请稍后再试。", "error"));
+      .catch(() => showToast(t("options.clearFailed"), "error"));
   });
   queryRequired<HTMLButtonElement>("#reset-subtitle-style").addEventListener("click", () => {
     translationColorInput.value = DEFAULT_SUBTITLE_SETTINGS.translationColor;
@@ -562,7 +568,7 @@ function bindForm(): void {
           displayMode,
         },
       });
-      showToast("已恢复字幕默认样式与自动位置。", "success");
+      showToast(t("options.captionStyleRestored"), "success");
     }
   });
 
@@ -588,8 +594,9 @@ async function initialize(): Promise<void> {
   try {
     await loadOptions();
   } catch {
-    showToast("偏好设置暂时无法加载，请刷新重试。", "error");
+    showToast(t("options.loadFailed"), "error");
   }
 }
 
+localizeDocument(document);
 void initialize();

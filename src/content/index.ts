@@ -38,8 +38,9 @@ import { CommentTranslationController } from "./comments/comment-controller";
 import { SelectionController } from "./selection/selection-controller";
 import { ensureContentStyle } from "./content-style";
 import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
+import { t } from "../shared/i18n";
 
-const PAGE_UNSUPPORTED_MESSAGE = "当前 YouTube 页面暂不支持读取。";
+const PAGE_UNSUPPORTED_MESSAGE = t("content.pageUnsupported");
 const PLAYER_CONTROL_CONFIRMATION_DELAY_MS = 200;
 
 let captionOverlay: CaptionOverlayController | null = null;
@@ -139,11 +140,11 @@ function selectDefaultCaptionTrack(snapshot: YouTubeVideoSnapshot) {
 function captionErrorMessage(result: Extract<CaptionLoadResult, { status: "error" }>): string {
   switch (result.reason) {
     case "http":
-      return "字幕链接已失效或暂时不可用，请重试。";
+      return t("content.captionHttp");
     case "network":
-      return "无法读取字幕，请检查网络后重试。";
+      return t("content.captionNetwork");
     case "unsupported-format":
-      return "当前字幕格式暂不支持读取，请稍后重试。";
+      return t("content.captionUnsupported");
   }
 }
 
@@ -291,11 +292,8 @@ function renderStatus(documentNode: Document, status: HTMLElement, tone: "info" 
   status.hidden = false;
 }
 
-function partialTranslationMessage(errorMessage: string): string {
-  if (errorMessage.includes("超时")) {
-    return "翻译超时，部分字幕已完成，点击继续。";
-  }
-  return "翻译未完成，部分字幕已完成，点击继续。";
+function partialTranslationMessage(): string {
+  return t("content.partialTranslation");
 }
 
 function mountPlayerControl(
@@ -314,7 +312,7 @@ function mountPlayerControl(
   const button = documentNode.createElement("button");
   button.className = "xtranslator-control";
   button.type = "button";
-  setPlayerButtonLabel(button, "开始翻译");
+  setPlayerButtonLabel(button, t("content.startTranslation"));
   setPlayerBrandIcon(documentNode, button);
 
   const status = documentNode.createElement("div");
@@ -342,8 +340,8 @@ function mountPlayerControl(
     overlay.load(response.blocks);
     overlay.setMode(response.displayMode);
     const translatedCount = response.blocks.filter((block) => block.translatedText.trim()).length;
-    renderStatus(documentNode, status, "success", Check, false, `已加载缓存：${response.blocks.length} 段`);
-    setPlayerButtonLabel(button, "再次翻译");
+    renderStatus(documentNode, status, "success", Check, false, t("content.cacheLoaded", { count: response.blocks.length }));
+    setPlayerButtonLabel(button, t("content.translateAgain"));
     await publishVideoTranslationStatus({
       phase: "translated",
       videoId: snapshot.videoId,
@@ -356,7 +354,7 @@ function mountPlayerControl(
 
   button.addEventListener("click", () => {
     const runId = `video-${nextVideoTranslationRunId += 1}`;
-    setPlayerButtonLabel(button, "翻译中");
+    setPlayerButtonLabel(button, t("content.translating"));
     setButtonIcon(documentNode, button, LoaderCircle, true);
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
@@ -375,7 +373,7 @@ function mountPlayerControl(
         return;
       }
 
-      renderStatus(documentNode, status, "info", LoaderCircle, true, "正在读取缓存…");
+      renderStatus(documentNode, status, "info", LoaderCircle, true, t("content.readingCache"));
       const cachedResponse = await readCache();
       if (!isCurrent()) {
         return;
@@ -386,8 +384,8 @@ function mountPlayerControl(
       }
 
       if (!track) {
-        const message = "当前视频没有可用字幕，且没有本地翻译缓存。";
-        setPlayerButtonLabel(button, "重试字幕");
+        const message = t("content.noCaptionsOrCache");
+        setPlayerButtonLabel(button, t("content.retryCaptions"));
         renderStatus(documentNode, status, "error", CircleAlert, false, message);
         await publishVideoTranslationStatus({
           phase: "error",
@@ -404,7 +402,7 @@ function mountPlayerControl(
         videoId: snapshot.videoId,
         sourceTrackFingerprint: createCaptionTrackFingerprint(track),
       };
-      renderStatus(documentNode, status, "info", LoaderCircle, true, "正在读取字幕…");
+      renderStatus(documentNode, status, "info", LoaderCircle, true, t("content.readingCaptions"));
       await publishVideoTranslationStatus({ phase: "reading-captions", videoId: snapshot.videoId, videoTitle: snapshot.title });
       const result = await loadCaptionTranscript(snapshot, track);
       if (!isCurrent()) {
@@ -412,7 +410,7 @@ function mountPlayerControl(
       }
       if (result.status === "ready") {
         const translationBlockCount = await resolveTranslationBlockCount(result.segments, track.languageCode);
-        renderStatus(documentNode, status, "info", LoaderCircle, true, `正在翻译 ${translationBlockCount} 段…`);
+        renderStatus(documentNode, status, "info", LoaderCircle, true, t("content.translatingSegments", { count: translationBlockCount }));
         await publishVideoTranslationStatus({
           phase: "translating",
           videoId: snapshot.videoId,
@@ -428,8 +426,8 @@ function mountPlayerControl(
           if (response.ok) {
             if (response.skipped) {
               deactivateCaptionOverlay();
-              renderStatus(documentNode, status, "success", Check, false, "当前字幕已是目标语言，无需翻译");
-              setPlayerButtonLabel(button, "无需翻译");
+              renderStatus(documentNode, status, "success", Check, false, t("content.noTranslationNeeded"));
+              setPlayerButtonLabel(button, t("content.noTranslation"));
               await publishVideoTranslationStatus({
                 phase: "translated",
                 videoId: snapshot.videoId,
@@ -443,8 +441,8 @@ function mountPlayerControl(
               overlay.setMode(response.displayMode);
 
               const translatedCount = response.blocks.length - response.missingIds.length;
-              renderStatus(documentNode, status, "success", Check, false, `翻译完成：${response.blocks.length} 段`);
-              setPlayerButtonLabel(button, "再次翻译");
+              renderStatus(documentNode, status, "success", Check, false, t("content.translationComplete", { count: response.blocks.length }));
+              setPlayerButtonLabel(button, t("content.translateAgain"));
               await publishVideoTranslationStatus({
                 phase: "translated",
                 videoId: snapshot.videoId,
@@ -458,17 +456,17 @@ function mountPlayerControl(
               const overlay = getCaptionOverlay(documentNode, anchors.player);
               overlay.load(response.partial.blocks);
               overlay.setMode(response.partial.displayMode);
-              setPlayerButtonLabel(button, "继续翻译");
+              setPlayerButtonLabel(button, t("content.continueTranslation"));
               renderStatus(
                 documentNode,
                 status,
                 "error",
                 CircleAlert,
                 false,
-                partialTranslationMessage(response.errorMessage),
+                partialTranslationMessage(),
               );
             } else {
-              setPlayerButtonLabel(button, "重试");
+              setPlayerButtonLabel(button, t("content.retry"));
               renderStatus(documentNode, status, "error", CircleAlert, false, response.errorMessage);
             }
             await publishVideoTranslationStatus({
@@ -482,8 +480,8 @@ function mountPlayerControl(
           if (!isCurrent()) {
             return;
           }
-          const message = "无法连接到翻译服务，请检查扩展设置后重试。";
-          setPlayerButtonLabel(button, "重试");
+          const message = t("content.serviceUnavailable");
+          setPlayerButtonLabel(button, t("content.retry"));
           renderStatus(documentNode, status, "error", CircleAlert, false, message);
           await publishVideoTranslationStatus({
             phase: "error",
@@ -497,7 +495,7 @@ function mountPlayerControl(
           return;
         }
         const message = captionErrorMessage(result);
-        setPlayerButtonLabel(button, "重试字幕");
+        setPlayerButtonLabel(button, t("content.retryCaptions"));
         renderStatus(documentNode, status, "error", CircleAlert, false, message);
         await publishVideoTranslationStatus({
           phase: "error",

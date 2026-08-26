@@ -16,6 +16,7 @@ import {
   type SubtitleSettings,
 } from "../shared/contracts/settings";
 import { XTRANSLATOR_DOM, YOUTUBE_PAGE_SELECTOR } from "../shared/youtube/youtube-page-contract";
+import { t } from "../shared/i18n";
 
 export const CAPTION_SUPPRESSED_CLASS = "xtranslator-captions-suppressed";
 export const CAPTION_PROGRESS_GAP_PX = 8;
@@ -339,7 +340,7 @@ export class CaptionOverlayController {
     const card = this.documentNode.createElement("div");
     card.className = "xtranslator-caption-card";
     card.dataset.xtranslatorBlockId = blockId;
-    card.setAttribute("aria-label", "上下拖动可调整字幕位置");
+    card.setAttribute("aria-label", t("content.captionPosition"));
     lines.forEach((line) => this.appendLine(card, line.text, line.className, blockId));
     this.overlay?.append(card);
     this.positionCard(card);

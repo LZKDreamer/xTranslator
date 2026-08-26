@@ -5,20 +5,21 @@
 // mapped text never includes the API key or a request/response body.
 
 import type { ProviderFailureReason } from "./provider-types";
+import { t } from "../i18n";
 
 export function userFacingProviderMessage(reason: ProviderFailureReason): string {
   switch (reason) {
     case "auth":
-      return "服务密钥无效或权限不足，请到偏好设置检查。";
+      return t("provider.auth");
     case "rate-limit":
-      return "翻译服务当前较忙，请稍后再试。";
+      return t("provider.rateLimit");
     case "timeout":
-      return "翻译请求超时，请重试。";
+      return t("provider.timeout");
     case "network":
-      return "暂时无法连接翻译服务，请检查网络后再试。";
+      return t("provider.network");
     case "model":
-      return "当前模型不可用，请到偏好设置更换模型。";
+      return t("provider.model");
     case "bad-response":
-      return "翻译服务暂时异常，请稍后再试。";
+      return t("provider.badResponse");
   }
 }

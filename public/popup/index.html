@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,22 +14,22 @@
           <img class="brand-mark" src="../icons/icon-48.png" alt="" width="32" height="32" />
           <span id="popup-title"><span class="brand-x">x</span>Translator</span>
         </div>
-        <button id="open-options" class="icon-button" type="button" aria-label="打开设置" title="打开设置">
+        <button id="open-options" class="icon-button" type="button" data-i18n-aria-label="popup.openSettings" data-i18n-title="popup.openSettings">
           <i data-lucide="settings" aria-hidden="true"></i>
         </button>
       </header>
       <section id="locale-panel" class="config-panel" aria-live="polite" data-state="ready">
-        <p class="eyebrow">翻译语言</p>
-        <p id="locale-detail" class="config-detail">自动跟随浏览器语言</p>
+        <p class="eyebrow" data-i18n="popup.translationLanguage">Translation language</p>
+        <p id="locale-detail" class="config-detail" data-i18n="popup.followBrowserLanguage">Follow browser language</p>
       </section>
       <section id="config-panel" class="config-panel" aria-live="polite" data-state="idle">
-        <p class="eyebrow">翻译引擎</p>
-        <p id="config-detail" class="config-detail">加载中…</p>
+        <p class="eyebrow" data-i18n="popup.translationEngine">Translation engine</p>
+        <p id="config-detail" class="config-detail" data-i18n="popup.loading">Loading…</p>
       </section>
       <section id="translation-panel" class="translation-panel" aria-live="polite" data-state="idle">
-        <p class="eyebrow">观看状态</p>
-        <p id="translation-video-title" class="translation-title">准备好开始翻译</p>
-        <p id="translation-detail" class="translation-detail">打开 YouTube 视频，点击播放器中的 xTranslator 按钮。</p>
+        <p class="eyebrow" data-i18n="popup.watchStatus">Viewing status</p>
+        <p id="translation-video-title" class="translation-title" data-i18n="popup.readyToTranslate">Ready to translate</p>
+        <p id="translation-detail" class="translation-detail" data-i18n="popup.openYoutubeVideo">Open a YouTube video and click the xTranslator button in the player.</p>
       </section>
       <p id="popup-status" class="status-message" role="status"></p>
     </main>

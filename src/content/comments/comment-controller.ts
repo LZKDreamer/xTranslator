@@ -16,6 +16,7 @@ import { buildThread, collectCommentBranch, dedupeComments, commentsToTextItems 
 import { XTRANSLATOR_DOM, YOUTUBE_PAGE_SELECTOR } from "../../shared/youtube/youtube-page-contract";
 import type { RenderedComment } from "../../shared/youtube/youtube-types";
 import { collectThreadComments, findCommentsRoot, readComment } from "./comment-dom";
+import { t } from "../../shared/i18n";
 
 type CommentLoadState = "idle" | "pending" | "done" | "failed";
 
@@ -168,7 +169,7 @@ export class CommentTranslationController {
     root.querySelectorAll<HTMLElement>("button.xtranslator-comment-action").forEach((element) => {
       if (element.getAttribute(XTRANSLATOR_DOM.mountAttribute) !== MOUNT_BATCH_CONTROL) {
         const label = element.querySelector<HTMLElement>(".xtranslator-comment-action-label");
-        if (label?.textContent === "翻译可见评论") {
+        if (label?.textContent === t("comment.translateVisible")) {
           element.remove();
         }
       }
@@ -196,7 +197,7 @@ export class CommentTranslationController {
       return;
     }
     if (!button) {
-      button = this.createActionButton("翻译可见评论", "翻译当前已显示的评论");
+      button = this.createActionButton(t("comment.translateVisible"), t("comment.translateVisibleAria"));
       button.setAttribute(XTRANSLATOR_DOM.mountAttribute, MOUNT_BATCH_CONTROL);
       button.addEventListener("click", () => void this.translateVisibleBatch(button!));
     }
@@ -303,7 +304,7 @@ export class CommentTranslationController {
     );
 
     if (!row.querySelector('[data-action="thread"]')) {
-      const threadButton = this.createActionButton("翻译这组评论", "翻译这组评论");
+      const threadButton = this.createActionButton(t("comment.translateThread"), t("comment.translateThread"));
       threadButton.dataset.action = "thread";
       // YouTube delegates reply toggles from the thread container. Do not let an
       // interaction with our button bubble into that handler.
@@ -327,11 +328,11 @@ export class CommentTranslationController {
     const threadComments = commentId ? collectCommentBranch(allThreadComments, commentId) : [];
     const group = commentId ? buildThread(threadComments, commentId) : null;
     if (!group || group.replies.length === 0) {
-      this.setButtonState(button, "未发现已展开回复", "error");
-      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, "翻译这组评论", "done"), 1800);
+      this.setButtonState(button, t("comment.noExpandedReplies"), "error");
+      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, t("comment.translateThread"), "done"), 1800);
       return;
     }
-    await this.requestTranslation(commentsToTextItems(threadComments), button, "翻译这组评论");
+    await this.requestTranslation(commentsToTextItems(threadComments), button, t("comment.translateThread"));
   }
 
   private async translateVisibleBatch(button: HTMLButtonElement): Promise<void> {
@@ -346,11 +347,11 @@ export class CommentTranslationController {
     if (candidates.length === 0) {
       // Surface feedback instead of silently doing nothing, so an extraction miss
       // is visible. Reset to the idle label shortly after.
-      this.setButtonState(button, "未发现可译评论", "error");
-      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, "翻译可见评论", "done"), 1800);
+      this.setButtonState(button, t("comment.noTranslatableComments"), "error");
+      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, t("comment.translateVisible"), "done"), 1800);
       return;
     }
-    await this.requestTranslation(commentsToTextItems(candidates), button, "翻译可见评论");
+    await this.requestTranslation(commentsToTextItems(candidates), button, t("comment.translateVisible"));
   }
 
   private collectVisibleComments(): RenderedComment[] {
@@ -406,7 +407,7 @@ export class CommentTranslationController {
   private async requestTranslation(
     items: TextTranslationItem[],
     button: HTMLButtonElement | null,
-    doneLabel = "翻译可见评论",
+    doneLabel = t("comment.translateVisible"),
   ): Promise<void> {
     const fresh: TextTranslationItem[] = [];
     for (const item of items) {
@@ -423,7 +424,7 @@ export class CommentTranslationController {
     }
 
     if (button) {
-      this.setButtonState(button, "翻译中…", "loading");
+      this.setButtonState(button, t("comment.translating"), "loading");
     }
     try {
       const videoTitle = this.getVideoTitle();
@@ -460,7 +461,7 @@ export class CommentTranslationController {
         }
       }
       if (button) {
-        this.setButtonState(button, hasFailure ? "重试未完成翻译" : doneLabel, hasFailure ? "error" : "done");
+        this.setButtonState(button, hasFailure ? t("comment.retryIncomplete") : doneLabel, hasFailure ? "error" : "done");
       }
     } catch {
       // Keep every item retryable. A provider failure must not make successful
@@ -470,7 +471,7 @@ export class CommentTranslationController {
         this.renderTranslation(item.id, "", "failed");
       }
       if (button) {
-        this.setButtonState(button, "重试未完成翻译", "error");
+        this.setButtonState(button, t("comment.retryIncomplete"), "error");
       }
     }
   }
@@ -531,7 +532,7 @@ export class CommentTranslationController {
     if (state === "failed") {
       const existingRetryButton = node.querySelector<HTMLButtonElement>('[data-action="comment-retry"]');
       if (existingRetryButton) {
-        existingRetryButton.textContent = "翻译失败，点击重试";
+        existingRetryButton.textContent = t("comment.translationFailedRetry");
         existingRetryButton.dataset.state = "error";
         existingRetryButton.disabled = false;
         existingRetryButton.setAttribute("aria-busy", "false");
@@ -542,8 +543,8 @@ export class CommentTranslationController {
       retryButton.className = "xtranslator-comment-retry";
       retryButton.type = "button";
       retryButton.dataset.action = "comment-retry";
-      retryButton.setAttribute("aria-label", `重试翻译评论：${commentId}`);
-      retryButton.textContent = "翻译失败，点击重试";
+      retryButton.setAttribute("aria-label", t("comment.retryComment", { id: commentId }));
+      retryButton.textContent = t("comment.translationFailedRetry");
       retryButton.addEventListener("pointerdown", (event) => event.stopPropagation(), true);
       retryButton.addEventListener("click", (event) => {
         event.preventDefault();
@@ -553,8 +554,8 @@ export class CommentTranslationController {
         if (!item) {
           return;
         }
-        this.setButtonState(retryButton, "翻译中…", "loading");
-        void this.requestTranslation([item], retryButton, "已重试");
+        this.setButtonState(retryButton, t("comment.translating"), "loading");
+        void this.requestTranslation([item], retryButton, t("comment.retried"));
       }, true);
       node.replaceChildren(retryButton);
       return;

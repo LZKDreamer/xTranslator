@@ -8,6 +8,7 @@ import {
 import { createIcons, Settings } from "../shared/icons";
 import { getProviderPreset } from "../shared/providers/provider-registry";
 import { resolveProviderApiKey } from "../shared/contracts/settings";
+import { getUiLocale, localizeDocument, t } from "../shared/i18n";
 
 function queryRequired<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -26,17 +27,17 @@ function updateConfig(response: SettingsMessageResponse): void {
   const model = response.settings.provider.model;
 
   if (resolveProviderApiKey(response.settings)) {
-    detail.textContent = `已连接 ${name}${model ? ` · ${model}` : ""}`;
+    detail.textContent = t("popup.connected", { name, model: model ? ` · ${model}` : "" });
     panel.dataset.state = "ready";
   } else {
-    detail.textContent = "尚未连接翻译服务，请打开设置完成连接。";
+    detail.textContent = t("popup.notConnected");
     panel.dataset.state = "error";
   }
 }
 
 function formatLocaleName(locale: string): string {
   try {
-    return new Intl.DisplayNames(["zh-CN"], { type: "language" }).of(locale) ?? locale;
+    return new Intl.DisplayNames([getUiLocale()], { type: "language" }).of(locale) ?? locale;
   } catch {
     return locale;
   }
@@ -45,7 +46,7 @@ function formatLocaleName(locale: string): string {
 function updateLocale(response: SettingsMessageResponse): void {
   const detail = queryRequired<HTMLElement>("#locale-detail");
   const panel = queryRequired<HTMLElement>("#locale-panel");
-  detail.textContent = `自动跟随浏览器语言 · ${formatLocaleName(response.resolvedTargetLocale)}`;
+  detail.textContent = t("popup.browserLanguage", { language: formatLocaleName(response.resolvedTargetLocale) });
   panel.dataset.state = "ready";
 }
 
@@ -53,33 +54,33 @@ function updateVideoTranslationStatus(status: VideoTranslationStatus): void {
   const title = queryRequired<HTMLElement>("#translation-video-title");
   const detail = queryRequired<HTMLElement>("#translation-detail");
   const panel = queryRequired<HTMLElement>("#translation-panel");
-  title.textContent = status.videoTitle ?? "准备好开始翻译";
+  title.textContent = status.videoTitle ?? t("popup.readyToTranslate");
 
   switch (status.phase) {
     case "idle":
-      detail.textContent = "打开 YouTube 视频，点击播放器中的 xTranslator 按钮。";
+      detail.textContent = t("popup.openYoutubeVideo");
       panel.dataset.state = "idle";
       break;
     case "reading-captions":
-      detail.textContent = "正在准备字幕…";
+      detail.textContent = t("popup.preparingCaptions");
       panel.dataset.state = "loading";
       break;
     case "ready-for-translation":
-      detail.textContent = "字幕已准备好，马上开始翻译。";
+      detail.textContent = t("popup.captionsReady");
       panel.dataset.state = "success";
       break;
     case "translating":
-      detail.textContent = `正在翻译 ${status.segmentCount ?? 0} 处字幕…`;
+      detail.textContent = t("popup.translatingCaptions", { count: status.segmentCount ?? 0 });
       panel.dataset.state = "loading";
       break;
     case "translated":
       detail.textContent = status.segmentCount === 0
-        ? "当前字幕已是目标语言，无需翻译。"
-        : `翻译完成 · ${status.translatedCount ?? 0}/${status.segmentCount ?? 0} 处字幕`;
+        ? t("popup.noTranslationNeeded")
+        : t("popup.translationComplete", { translated: status.translatedCount ?? 0, total: status.segmentCount ?? 0 });
       panel.dataset.state = "success";
       break;
     case "error":
-      detail.textContent = status.errorMessage ?? "这段视频暂时无法翻译，请稍后再试。";
+      detail.textContent = status.errorMessage ?? t("popup.videoUnavailable");
       panel.dataset.state = "error";
       break;
   }
@@ -111,7 +112,7 @@ async function loadVideoTranslationStatus(): Promise<void> {
     }
     updateVideoTranslationStatus(response);
   } catch {
-    updateVideoTranslationStatus({ phase: "error", errorMessage: "视频翻译状态暂时不可用。" });
+    updateVideoTranslationStatus({ phase: "error", errorMessage: t("popup.statusUnavailable") });
   }
 }
 
@@ -122,6 +123,7 @@ function bindOptionsButton(): void {
 }
 
 createIcons({ icons: { Settings } });
+localizeDocument(document);
 bindOptionsButton();
 void loadConfig();
 void loadVideoTranslationStatus();

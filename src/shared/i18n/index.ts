@@ -1,0 +1,311 @@
+export type UiLocale = "en" | "zh-CN";
+
+type MessageValues = Record<string, number | string>;
+
+const en = {
+  "popup.openSettings": "Open settings",
+  "popup.translationLanguage": "Translation language",
+  "popup.followBrowserLanguage": "Follow browser language",
+  "popup.translationEngine": "Translation engine",
+  "popup.loading": "Loading…",
+  "popup.watchStatus": "Viewing status",
+  "popup.readyToTranslate": "Ready to translate",
+  "popup.openYoutubeVideo": "Open a YouTube video and click the xTranslator button in the player.",
+  "popup.connected": "Connected to {name}{model}",
+  "popup.notConnected": "No translation service is connected. Open settings to connect one.",
+  "popup.browserLanguage": "Follow browser language · {language}",
+  "popup.preparingCaptions": "Preparing captions…",
+  "popup.captionsReady": "Captions are ready. Translation will begin shortly.",
+  "popup.translatingCaptions": "Translating {count} caption segments…",
+  "popup.noTranslationNeeded": "The captions are already in the target language.",
+  "popup.translationComplete": "Translation complete · {translated}/{total} caption segments",
+  "popup.videoUnavailable": "This video cannot be translated right now. Please try again later.",
+  "popup.statusUnavailable": "Video translation status is temporarily unavailable.",
+  "options.title": "xTranslator Preferences",
+  "options.preferences": "Preferences",
+  "options.translationService": "Translation service",
+  "options.serviceHelp": "Enter a service key and load a model. Your settings are saved automatically when all three fields are complete.",
+  "options.serviceKey": "Service key (API Key)",
+  "options.keyHelp": "Your key is stored only on this device and is used to connect to the selected translation service.",
+  "options.loadModels": "Load models",
+  "options.translationModel": "Translation model",
+  "options.subtitleDisplay": "Caption display",
+  "options.captionMode": "Caption mode",
+  "options.originalOnly": "Original only",
+  "options.translationOnly": "Translation only",
+  "options.bilingual": "Original + translation",
+  "options.captionModeHelp": "Choose how captions appear in videos. Changes apply to the current video immediately.",
+  "options.subtitleStyle": "Caption style",
+  "options.translationColor": "Translation color",
+  "options.originalColor": "Original color",
+  "options.translationFontSize": "Translation size",
+  "options.originalFontSize": "Original size",
+  "options.captionPositionHelp": "Drag captions vertically in the player to avoid important content. Their position and style are saved automatically.",
+  "options.resetCaptionStyle": "Restore default caption style and position",
+  "options.selectionTranslation": "Selection translation",
+  "options.enableSelectionTranslation": "Enable selection translation",
+  "options.selectionDisabledHelp": "When disabled, selecting text will not show the translation panel and the context menu will not start a translation.",
+  "options.includeContext": "Use surrounding context when translating selected text",
+  "options.includeContextHelp": "When enabled, the surrounding sentences help produce a more natural translation.",
+  "options.translationHistory": "Translation history",
+  "options.emptyHistory": "No translation history has been saved.",
+  "options.reload": "Reload",
+  "options.clearHistory": "Clear history",
+  "options.unknownService": "The selected translation service is not recognized.",
+  "options.enterApiKey": "Enter an API key to load models.",
+  "options.findingModels": "Finding available models…",
+  "options.modelsFound": "Found {count} available models.",
+  "options.modelsFoundEnterKey": "Found {count} models. Enter an API key before saving.",
+  "options.noModels": "No models are available.",
+  "options.modelsUnavailable": "The model list is temporarily unavailable. Check your network connection or service key.",
+  "options.historyUnavailable": "Translation history is temporarily unavailable.",
+  "options.historyStats": "{count} saved entries · {size}",
+  "options.historyEntry": "{source} → {target} · {count} segments · {date}",
+  "options.delete": "Delete",
+  "options.deleteHistoryEntry": "Delete the translation history for {title}",
+  "options.deleteFailed": "This history entry could not be deleted. Please try again later.",
+  "options.saving": "Saving settings…",
+  "options.saved": "Settings saved.",
+  "options.saveFailed": "Settings could not be saved. Please try again later.",
+  "options.preferencesSaveFailed": "Preferences could not be saved. Please try again later.",
+  "options.apiKeyChanged": "The API key changed. Click Load models.",
+  "options.loadingConfiguredModels": "Loading configured models…",
+  "options.clearFailed": "Translation history could not be cleared. Please try again later.",
+  "options.captionStyleRestored": "Default caption style and automatic position restored.",
+  "options.loadFailed": "Preferences are temporarily unavailable. Refresh and try again.",
+  "content.pageUnsupported": "This YouTube page is not supported.",
+  "content.captionHttp": "The caption link has expired or is temporarily unavailable. Please try again.",
+  "content.captionNetwork": "Captions could not be read. Check your network connection and try again.",
+  "content.captionUnsupported": "This caption format is not supported yet. Please try again later.",
+  "content.partialTranslation": "Translation is incomplete. Some captions are ready; click to continue.",
+  "content.startTranslation": "Start translation",
+  "content.cacheLoaded": "Loaded cached translation: {count} segments",
+  "content.translateAgain": "Translate again",
+  "content.translating": "Translating",
+  "content.readingCache": "Reading cached translation…",
+  "content.noCaptionsOrCache": "This video has no available captions or local translation cache.",
+  "content.retryCaptions": "Retry captions",
+  "content.readingCaptions": "Reading captions…",
+  "content.translatingSegments": "Translating {count} segments…",
+  "content.noTranslationNeeded": "The captions are already in the target language.",
+  "content.noTranslation": "No translation needed",
+  "content.translationComplete": "Translation complete: {count} segments",
+  "content.continueTranslation": "Continue translation",
+  "content.retry": "Retry",
+  "content.serviceUnavailable": "The translation service could not be reached. Check extension settings and try again.",
+  "content.captionPosition": "Drag up or down to adjust caption position",
+  "comment.translateVisible": "Translate visible comments",
+  "comment.translateVisibleAria": "Translate currently visible comments",
+  "comment.translateThread": "Translate this thread",
+  "comment.noExpandedReplies": "No expanded replies found",
+  "comment.noTranslatableComments": "No translatable comments found",
+  "comment.translating": "Translating…",
+  "comment.retryIncomplete": "Retry incomplete translations",
+  "comment.translationFailedRetry": "Translation failed. Click to retry",
+  "comment.retryComment": "Retry translation for comment: {id}",
+  "comment.retried": "Retried",
+  "selection.toolbar": "Selection translation",
+  "selection.translate": "Translate",
+  "selection.translateAria": "Translate selected text",
+  "selection.copyAria": "Copy selected text",
+  "selection.closeAria": "Close selection panel",
+  "selection.translating": "Translating…",
+  "selection.failed": "Translation failed. Please try again.",
+  "selection.copyTranslationAria": "Copy translation",
+  "selection.cancelAria": "Cancel translation",
+  "selection.closeTranslationAria": "Close translation panel",
+  "background.notConnected": "No translation service is connected. Complete preferences first.",
+  "background.unknownService": "The translation service is not recognized: {id}",
+  "background.noModel": "No translation model is selected. Open settings, load models, and select one.",
+  "background.contextMenu": "Translate selected text",
+  "background.videoFailed": "Video translation failed. Please try again.",
+  "background.translationFailed": "Translation failed. Please try again.",
+  "translation.missingCaptions": "{count} caption segments did not receive a valid translation. Completed segments were saved; please try again.",
+  "provider.auth": "The service key is invalid or lacks permission. Check it in Preferences.",
+  "provider.rateLimit": "The translation service is busy. Please try again later.",
+  "provider.timeout": "The translation request timed out. Please try again.",
+  "provider.network": "The translation service could not be reached. Check your network connection and try again.",
+  "provider.model": "The selected model is unavailable. Choose another model in Preferences.",
+  "provider.badResponse": "The translation service is temporarily unavailable. Please try again later.",
+} as const;
+
+const zhCN: Record<keyof typeof en, string> = {
+  "popup.openSettings": "打开设置",
+  "popup.translationLanguage": "翻译语言",
+  "popup.followBrowserLanguage": "自动跟随浏览器语言",
+  "popup.translationEngine": "翻译引擎",
+  "popup.loading": "加载中…",
+  "popup.watchStatus": "观看状态",
+  "popup.readyToTranslate": "准备好开始翻译",
+  "popup.openYoutubeVideo": "打开 YouTube 视频，点击播放器中的 xTranslator 按钮。",
+  "popup.connected": "已连接 {name}{model}",
+  "popup.notConnected": "尚未连接翻译服务，请打开设置完成连接。",
+  "popup.browserLanguage": "自动跟随浏览器语言 · {language}",
+  "popup.preparingCaptions": "正在准备字幕…",
+  "popup.captionsReady": "字幕已准备好，马上开始翻译。",
+  "popup.translatingCaptions": "正在翻译 {count} 处字幕…",
+  "popup.noTranslationNeeded": "当前字幕已是目标语言，无需翻译。",
+  "popup.translationComplete": "翻译完成 · {translated}/{total} 处字幕",
+  "popup.videoUnavailable": "这段视频暂时无法翻译，请稍后再试。",
+  "popup.statusUnavailable": "视频翻译状态暂时不可用。",
+  "options.title": "xTranslator 偏好设置",
+  "options.preferences": "偏好设置",
+  "options.translationService": "翻译服务",
+  "options.serviceHelp": "填写服务密钥并加载模型，三项配置完整后会自动保存。",
+  "options.serviceKey": "服务密钥（API Key）",
+  "options.keyHelp": "密钥只保存在本机，用于连接你选择的翻译服务。",
+  "options.loadModels": "加载模型",
+  "options.translationModel": "翻译模型",
+  "options.subtitleDisplay": "字幕显示",
+  "options.captionMode": "字幕模式",
+  "options.originalOnly": "仅显示原文",
+  "options.translationOnly": "仅显示译文",
+  "options.bilingual": "原文 + 译文",
+  "options.captionModeHelp": "选择视频中的字幕呈现方式，保存后会立即应用到正在播放的视频。",
+  "options.subtitleStyle": "字幕样式",
+  "options.translationColor": "译文颜色",
+  "options.originalColor": "原文颜色",
+  "options.translationFontSize": "译文字号",
+  "options.originalFontSize": "原文字号",
+  "options.captionPositionHelp": "字幕在播放器内可上下拖动以避开画面内容；位置和样式会自动保存。",
+  "options.resetCaptionStyle": "恢复字幕默认样式与位置",
+  "options.selectionTranslation": "划词翻译",
+  "options.enableSelectionTranslation": "启用划词翻译",
+  "options.selectionDisabledHelp": "关闭后，选中文字不会显示翻译浮层，右键菜单也不会触发划词翻译。",
+  "options.includeContext": "翻译选中文本时参考前后文",
+  "options.includeContextHelp": "开启后会结合前后句，让翻译更贴合语境。",
+  "options.translationHistory": "翻译记录",
+  "options.emptyHistory": "还没有保存的翻译记录。",
+  "options.reload": "重新加载",
+  "options.clearHistory": "清空记录",
+  "options.unknownService": "暂时无法识别该翻译服务。",
+  "options.enterApiKey": "请填写 API Key 后加载模型。",
+  "options.findingModels": "正在查找可用模型…",
+  "options.modelsFound": "找到 {count} 个可用模型。",
+  "options.modelsFoundEnterKey": "找到 {count} 个模型，请填写 API Key 后保存。",
+  "options.noModels": "没有可用模型。",
+  "options.modelsUnavailable": "模型列表暂时无法加载，请检查网络或服务密钥。",
+  "options.historyUnavailable": "翻译记录暂时无法加载。",
+  "options.historyStats": "已保存 {count} 条记录 · {size}",
+  "options.historyEntry": "{source} → {target} · {count} 段 · {date}",
+  "options.delete": "删除",
+  "options.deleteHistoryEntry": "删除 {title} 的翻译记录",
+  "options.deleteFailed": "删除这条记录失败，请稍后再试。",
+  "options.saving": "正在保存配置…",
+  "options.saved": "配置已保存。",
+  "options.saveFailed": "配置保存失败，请稍后重试。",
+  "options.preferencesSaveFailed": "偏好设置保存失败，请稍后重试。",
+  "options.apiKeyChanged": "API Key 已变化，请点击“加载模型”。",
+  "options.loadingConfiguredModels": "正在加载已配置模型…",
+  "options.clearFailed": "清空翻译记录失败，请稍后再试。",
+  "options.captionStyleRestored": "已恢复字幕默认样式与自动位置。",
+  "options.loadFailed": "偏好设置暂时无法加载，请刷新重试。",
+  "content.pageUnsupported": "当前 YouTube 页面暂不支持读取。",
+  "content.captionHttp": "字幕链接已失效或暂时不可用，请重试。",
+  "content.captionNetwork": "无法读取字幕，请检查网络后重试。",
+  "content.captionUnsupported": "当前字幕格式暂不支持读取，请稍后重试。",
+  "content.partialTranslation": "翻译未完成，部分字幕已完成，点击继续。",
+  "content.startTranslation": "开始翻译",
+  "content.cacheLoaded": "已加载缓存：{count} 段",
+  "content.translateAgain": "再次翻译",
+  "content.translating": "翻译中",
+  "content.readingCache": "正在读取缓存…",
+  "content.noCaptionsOrCache": "当前视频没有可用字幕，且没有本地翻译缓存。",
+  "content.retryCaptions": "重试字幕",
+  "content.readingCaptions": "正在读取字幕…",
+  "content.translatingSegments": "正在翻译 {count} 段…",
+  "content.noTranslationNeeded": "当前字幕已是目标语言，无需翻译。",
+  "content.noTranslation": "无需翻译",
+  "content.translationComplete": "翻译完成：{count} 段",
+  "content.continueTranslation": "继续翻译",
+  "content.retry": "重试",
+  "content.serviceUnavailable": "无法连接到翻译服务，请检查扩展设置后重试。",
+  "content.captionPosition": "上下拖动可调整字幕位置",
+  "comment.translateVisible": "翻译可见评论",
+  "comment.translateVisibleAria": "翻译当前已显示的评论",
+  "comment.translateThread": "翻译这组评论",
+  "comment.noExpandedReplies": "未发现已展开回复",
+  "comment.noTranslatableComments": "未发现可译评论",
+  "comment.translating": "翻译中…",
+  "comment.retryIncomplete": "重试未完成翻译",
+  "comment.translationFailedRetry": "翻译失败，点击重试",
+  "comment.retryComment": "重试翻译评论：{id}",
+  "comment.retried": "已重试",
+  "selection.toolbar": "划词翻译",
+  "selection.translate": "翻译",
+  "selection.translateAria": "翻译所选文本",
+  "selection.copyAria": "复制所选文本",
+  "selection.closeAria": "关闭划词浮层",
+  "selection.translating": "正在翻译…",
+  "selection.failed": "翻译失败，请重试。",
+  "selection.copyTranslationAria": "复制译文",
+  "selection.cancelAria": "取消翻译",
+  "selection.closeTranslationAria": "关闭译文面板",
+  "background.notConnected": "尚未连接翻译服务，请先完成偏好设置。",
+  "background.unknownService": "暂时无法识别翻译服务：{id}",
+  "background.noModel": "尚未选择翻译模型，请先打开设置加载并选择模型。",
+  "background.contextMenu": "翻译所选文本",
+  "background.videoFailed": "视频翻译失败，请重试。",
+  "background.translationFailed": "翻译失败，请重试。",
+  "translation.missingCaptions": "{count} 段字幕没有获得有效译文，已保存已完成部分，请重试。",
+  "provider.auth": "服务密钥无效或权限不足，请到偏好设置检查。",
+  "provider.rateLimit": "翻译服务当前较忙，请稍后再试。",
+  "provider.timeout": "翻译请求超时，请重试。",
+  "provider.network": "暂时无法连接翻译服务，请检查网络后再试。",
+  "provider.model": "当前模型不可用，请到偏好设置更换模型。",
+  "provider.badResponse": "翻译服务暂时异常，请稍后再试。",
+};
+
+const messages = { en, "zh-CN": zhCN } as const;
+
+export type MessageKey = keyof typeof en;
+
+export function getUiLocale(language = typeof navigator === "undefined" ? "" : navigator.language): UiLocale {
+  try {
+    const locale = new Intl.Locale(language).maximize();
+    return locale.language === "zh" && locale.script === "Hans" ? "zh-CN" : "en";
+  } catch {
+    return language.toLowerCase() === "zh-cn" ? "zh-CN" : "en";
+  }
+}
+
+export function translate(locale: UiLocale, key: MessageKey, values: MessageValues = {}): string {
+  return messages[locale][key].replace(/\{(\w+)\}/gu, (placeholder, name: string) => {
+    const value = values[name];
+    return value === undefined ? placeholder : String(value);
+  });
+}
+
+export function t(key: MessageKey, values: MessageValues = {}): string {
+  return translate(getUiLocale(), key, values);
+}
+
+function translateAttribute(key: string): string | null {
+  return key in en ? t(key as MessageKey) : null;
+}
+
+export function localizeDocument(documentNode: Document): void {
+  documentNode.documentElement.lang = getUiLocale();
+  documentNode.querySelectorAll<HTMLElement>("[data-i18n]").forEach((element) => {
+    const translated = translateAttribute(element.dataset.i18n ?? "");
+    if (translated !== null) {
+      element.textContent = translated;
+    }
+  });
+  documentNode.querySelectorAll<HTMLElement>("[data-i18n-aria-label]").forEach((element) => {
+    const translated = translateAttribute(element.dataset.i18nAriaLabel ?? "");
+    if (translated !== null) {
+      element.setAttribute("aria-label", translated);
+    }
+  });
+  documentNode.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((element) => {
+    const translated = translateAttribute(element.dataset.i18nTitle ?? "");
+    if (translated !== null) {
+      element.setAttribute("title", translated);
+    }
+  });
+  const title = documentNode.querySelector<HTMLElement>("title[data-i18n]");
+  if (title) {
+    documentNode.title = title.textContent ?? documentNode.title;
+  }
+}

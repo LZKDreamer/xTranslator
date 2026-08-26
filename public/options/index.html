@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>xTranslator 偏好设置</title>
+    <title data-i18n="options.title">xTranslator Preferences</title>
     <link rel="stylesheet" href="../styles/tokens.css" />
     <link rel="stylesheet" href="./index.css" />
   </head>
@@ -13,79 +13,79 @@
         <img class="brand-mark" src="../icons/icon-48.png" alt="" width="48" height="48" />
         <div>
           <h1 id="options-title"><span>x</span>Translator</h1>
-          <p>偏好设置</p>
+          <p data-i18n="options.preferences">Preferences</p>
         </div>
       </header>
       <form id="settings-form" class="options-form">
         <section class="settings-panel" aria-labelledby="provider-title">
-          <h2 id="provider-title">翻译服务</h2>
-          <p class="help">填写服务密钥并加载模型，三项配置完整后会自动保存。</p>
-          <label for="provider-id">翻译服务</label>
+          <h2 id="provider-title" data-i18n="options.translationService">Translation service</h2>
+          <p class="help" data-i18n="options.serviceHelp">Enter a service key and load a model. Your settings are saved automatically when all three fields are complete.</p>
+          <label for="provider-id" data-i18n="options.translationService">Translation service</label>
           <select id="provider-id" name="provider-id"></select>
-          <label for="api-key">服务密钥（API Key）</label>
+          <label for="api-key" data-i18n="options.serviceKey">Service key (API Key)</label>
           <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="api-key-help" />
-          <p id="api-key-help" class="help">密钥只保存在本机，用于连接你选择的翻译服务。</p>
-          <button class="secondary-button" id="load-models" type="button" disabled>加载模型</button>
-          <label for="model">翻译模型</label>
+          <p id="api-key-help" class="help" data-i18n="options.keyHelp">Your key is stored only on this device and is used to connect to the selected translation service.</p>
+          <button class="secondary-button" id="load-models" type="button" disabled data-i18n="options.loadModels">Load models</button>
+          <label for="model" data-i18n="options.translationModel">Translation model</label>
           <select id="model" name="model" aria-describedby="model-status"></select>
           <p id="model-status" class="status-message" role="status" aria-live="polite"></p>
         </section>
 
         <section class="settings-panel" aria-labelledby="subtitles-title">
-          <h2 id="subtitles-title">字幕显示</h2>
-          <label for="caption-mode">字幕模式</label>
+          <h2 id="subtitles-title" data-i18n="options.subtitleDisplay">Caption display</h2>
+          <label for="caption-mode" data-i18n="options.captionMode">Caption mode</label>
           <select id="caption-mode" name="caption-mode">
-            <option value="original">仅显示原文</option>
-            <option value="translation">仅显示译文</option>
-            <option value="bilingual" selected>原文 + 译文</option>
+            <option value="original" data-i18n="options.originalOnly">Original only</option>
+            <option value="translation" data-i18n="options.translationOnly">Translation only</option>
+            <option value="bilingual" selected data-i18n="options.bilingual">Original + translation</option>
           </select>
-          <p class="help">选择视频中的字幕呈现方式，保存后会立即应用到正在播放的视频。</p>
-          <div class="subtitle-style-grid" aria-label="字幕样式">
+          <p class="help" data-i18n="options.captionModeHelp">Choose how captions appear in videos. Changes apply to the current video immediately.</p>
+          <div class="subtitle-style-grid" data-i18n-aria-label="options.subtitleStyle">
             <label class="subtitle-style-control" for="translation-color">
-              <span>译文颜色</span>
+              <span data-i18n="options.translationColor">Translation color</span>
               <input id="translation-color" name="translation-color" type="color" value="#ffd438" />
             </label>
             <label class="subtitle-style-control" for="original-color">
-              <span>原文颜色</span>
+              <span data-i18n="options.originalColor">Original color</span>
               <input id="original-color" name="original-color" type="color" value="#ececf0" />
             </label>
             <label class="subtitle-style-control" for="translation-font-scale">
-              <span>译文字号 <output id="translation-font-scale-value" for="translation-font-scale">100%</output></span>
+              <span><span data-i18n="options.translationFontSize">Translation size</span> <output id="translation-font-scale-value" for="translation-font-scale">100%</output></span>
               <input id="translation-font-scale" name="translation-font-scale" type="range" min="80" max="160" step="1" value="100" />
             </label>
             <label class="subtitle-style-control" for="original-font-scale">
-              <span>原文字号 <output id="original-font-scale-value" for="original-font-scale">100%</output></span>
+              <span><span data-i18n="options.originalFontSize">Original size</span> <output id="original-font-scale-value" for="original-font-scale">100%</output></span>
               <input id="original-font-scale" name="original-font-scale" type="range" min="80" max="160" step="1" value="100" />
             </label>
           </div>
-          <p class="help">字幕在播放器内可上下拖动以避开画面内容；位置和样式会自动保存。</p>
+          <p class="help" data-i18n="options.captionPositionHelp">Drag captions vertically in the player to avoid important content. Their position and style are saved automatically.</p>
           <div class="actions">
-            <button class="secondary-button" id="reset-subtitle-style" type="button">恢复字幕默认样式与位置</button>
+            <button class="secondary-button" id="reset-subtitle-style" type="button" data-i18n="options.resetCaptionStyle">Restore default caption style and position</button>
           </div>
         </section>
 
         <section class="settings-panel" aria-labelledby="selection-title">
-          <h2 id="selection-title">划词翻译</h2>
+          <h2 id="selection-title" data-i18n="options.selectionTranslation">Selection translation</h2>
           <label class="checkbox-row" for="selection-enabled">
             <input id="selection-enabled" name="selection-enabled" type="checkbox" checked />
-            <span>启用划词翻译</span>
+            <span data-i18n="options.enableSelectionTranslation">Enable selection translation</span>
           </label>
-          <p class="help">关闭后，选中文字不会显示翻译浮层，右键菜单也不会触发划词翻译。</p>
+          <p class="help" data-i18n="options.selectionDisabledHelp">When disabled, selecting text will not show the translation panel and the context menu will not start a translation.</p>
           <label class="checkbox-row" for="include-context">
             <input id="include-context" name="include-context" type="checkbox" />
-            <span>翻译选中文本时参考前后文</span>
+            <span data-i18n="options.includeContext">Use surrounding context when translating selected text</span>
           </label>
-          <p class="help">开启后会结合前后句，让翻译更贴合语境。</p>
+          <p class="help" data-i18n="options.includeContextHelp">When enabled, the surrounding sentences help produce a more natural translation.</p>
         </section>
 
         <section class="settings-panel" aria-labelledby="cache-title">
-          <h2 id="cache-title">翻译记录</h2>
+          <h2 id="cache-title" data-i18n="options.translationHistory">Translation history</h2>
           <p id="cache-stats" class="help" aria-live="polite"></p>
           <ul id="cache-list" class="cache-list"></ul>
-          <p id="cache-empty" class="status-message">还没有保存的翻译记录。</p>
+          <p id="cache-empty" class="status-message" data-i18n="options.emptyHistory">No translation history has been saved.</p>
           <div class="actions">
-            <button class="secondary-button" id="refresh-cache" type="button">重新加载</button>
-            <button class="secondary-button" id="clear-all-cache" type="button">清空记录</button>
+            <button class="secondary-button" id="refresh-cache" type="button" data-i18n="options.reload">Reload</button>
+            <button class="secondary-button" id="clear-all-cache" type="button" data-i18n="options.clearHistory">Clear history</button>
           </div>
         </section>
 

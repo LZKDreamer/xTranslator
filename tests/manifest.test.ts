@@ -7,6 +7,9 @@ interface WebAccessibleResourceRule {
 }
 
 interface ExtensionManifest {
+  default_locale?: string;
+  description?: string;
+  name?: string;
   web_accessible_resources?: WebAccessibleResourceRule[];
 }
 
@@ -15,6 +18,14 @@ const manifest = JSON.parse(
 ) as ExtensionManifest;
 
 describe("extension manifest", () => {
+  it("uses Chrome locale resources for extension metadata", () => {
+    expect(manifest.default_locale).toBe("en");
+    expect(manifest.name).toBe("__MSG_extensionName__");
+    expect(manifest.description).toBe("__MSG_extensionDescription__");
+    expect(() => readFileSync(new URL("../public/_locales/en/messages.json", import.meta.url), "utf8")).not.toThrow();
+    expect(() => readFileSync(new URL("../public/_locales/zh_CN/messages.json", import.meta.url), "utf8")).not.toThrow();
+  });
+
   it("exposes logo assets to YouTube content pages", () => {
     const rules = manifest.web_accessible_resources ?? [];
 

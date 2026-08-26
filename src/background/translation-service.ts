@@ -33,6 +33,7 @@ import {
   type VideoTranslationCache,
 } from "../shared/storage/video-translation-cache";
 import { shouldTranslateText } from "../shared/locale/translation-needed";
+import { t } from "../shared/i18n";
 
 const MAX_TRANSLATION_ATTEMPTS = 2;
 const DEFAULT_TEMPERATURE = 0.1;
@@ -163,7 +164,7 @@ export class VideoTranslationService {
       }
       if (missingIds.length > 0) {
         return this.createPartialFailure(
-          `${missingIds.length} 段字幕没有获得有效译文，已保存已完成部分，请重试。`,
+          t("translation.missingCaptions", { count: missingIds.length }),
           inputBlocks,
           resolved,
           missingIds,
