@@ -13,6 +13,7 @@ import {
 } from "../shared/contracts/settings";
 import { createProviderAdapter, getProviderPreset, listProviderPresets } from "../shared/providers/provider-registry";
 import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
+import { checkForExtensionUpdate } from "../shared/extension-update";
 import { getUiLocale, localizeDocument, t } from "../shared/i18n";
 
 function queryRequired<T extends Element>(selector: string): T {
@@ -248,6 +249,39 @@ function setTranslationStatus(message: string, state: "info" | "success" | "erro
   const status = queryRequired<HTMLElement>("#model-status");
   status.textContent = message;
   status.dataset.state = state;
+}
+
+async function loadUpdate(): Promise<void> {
+  const currentVersion = chrome.runtime.getManifest().version;
+  const currentVersionElement = queryRequired<HTMLElement>("#current-version");
+  const latestVersionElement = queryRequired<HTMLElement>("#latest-version");
+  const statusElement = queryRequired<HTMLElement>("#version-update-status");
+  const downloadLink = queryRequired<HTMLAnchorElement>("#options-download-update");
+  currentVersionElement.textContent = currentVersion;
+  latestVersionElement.textContent = "—";
+  statusElement.textContent = t("options.updateChecking");
+  statusElement.dataset.state = "info";
+  downloadLink.hidden = true;
+
+  const result = await checkForExtensionUpdate(currentVersion);
+  switch (result.state) {
+    case "available":
+      latestVersionElement.textContent = result.update.version;
+      statusElement.textContent = t("options.updateAvailable", { version: result.update.version });
+      statusElement.dataset.state = "success";
+      downloadLink.href = result.update.downloadUrl;
+      downloadLink.hidden = false;
+      break;
+    case "up-to-date":
+      latestVersionElement.textContent = currentVersion;
+      statusElement.textContent = t("options.updateUpToDate");
+      statusElement.dataset.state = "success";
+      break;
+    case "unavailable":
+      statusElement.textContent = t("options.updateUnavailable");
+      statusElement.dataset.state = "error";
+      break;
+  }
 }
 
 function getProviderDraft(providerId: string): ProviderDraft {
@@ -596,6 +630,7 @@ function updateSubtitleFontScaleLabels(): void {
 
 async function initialize(): Promise<void> {
   bindForm();
+  void loadUpdate();
   try {
     await loadOptions();
   } catch {

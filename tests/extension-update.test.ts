@@ -1,4 +1,4 @@
-import { compareExtensionVersions, getAvailableUpdate, UPDATE_MANIFEST_URL } from "../src/shared/extension-update";
+import { checkForExtensionUpdate, compareExtensionVersions, getAvailableUpdate, UPDATE_MANIFEST_URL } from "../src/shared/extension-update";
 import { describe, expect, it } from "vitest";
 
 describe("extension update", () => {
@@ -26,5 +26,21 @@ describe("extension update", () => {
     expect(getAvailableUpdate({ version: "1.0.1", downloadUrl: "https://cdn.jsdelivr.net/update.zip" }, "1.0.0")).toBeNull();
     expect(getAvailableUpdate({ version: "1.0.1", downloadUrl: "https://github.com/update.zip" }, "1.0.0")).toBeNull();
     expect(getAvailableUpdate({ version: "invalid", downloadUrl: "https://cdn.jsdelivr.net/update.zip" }, "1.0.0")).toBeNull();
+  });
+
+  it("reports the update check state", async () => {
+    await expect(checkForExtensionUpdate("1.0.0", async () => new Response(JSON.stringify({
+      version: "1.0.1",
+      downloadUrl: "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@v1.0.1/releases/xTranslator-1.0.1.zip",
+    })))).resolves.toEqual({
+      state: "available",
+      update: {
+        version: "1.0.1",
+        downloadUrl: "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@v1.0.1/releases/xTranslator-1.0.1.zip",
+      },
+    });
+    await expect(checkForExtensionUpdate("1.0.1", async () => new Response("not found", { status: 404 }))).resolves.toEqual({
+      state: "unavailable",
+    });
   });
 });

@@ -44,5 +44,5 @@ https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@v版本号/releases/xTranslat
 
 - 不使用 GitHub Release 附件，也不请求 GitHub API。
 - 用户首次安装时下载 zip、解压，并在 `chrome://extensions` 中选择“加载已解压的扩展程序”。
-- 已安装的扩展打开弹窗时检查 jsDelivr 更新清单；有新版本时展示下载链接，用户手动安装新版。
+- 已安装的扩展打开弹窗或设置页时检查 jsDelivr 更新清单；弹窗会提示新版本，设置页底部的“版本更新”卡片会显示当前版本、检查结果和下载链接。用户手动安装新版。
 - jsDelivr 同步新 tag 可能有短暂延迟。发布脚本会验证下载链接；验证失败时不要复用 tag，等待 CDN 同步后重新检查。

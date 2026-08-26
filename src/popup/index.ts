@@ -8,7 +8,7 @@ import {
 import { createIcons, Settings } from "../shared/icons";
 import { getProviderPreset } from "../shared/providers/provider-registry";
 import { resolveProviderApiKey } from "../shared/contracts/settings";
-import { getAvailableUpdate, UPDATE_MANIFEST_URL } from "../shared/extension-update";
+import { checkForExtensionUpdate } from "../shared/extension-update";
 import { getUiLocale, localizeDocument, t } from "../shared/i18n";
 
 function queryRequired<T extends Element>(selector: string): T {
@@ -124,21 +124,14 @@ function bindOptionsButton(): void {
 }
 
 async function loadUpdate(): Promise<void> {
-  try {
-    const response = await fetch(UPDATE_MANIFEST_URL, { cache: "no-store" });
-    const update = getAvailableUpdate(await response.json(), chrome.runtime.getManifest().version);
-    if (!update) {
-      return;
-    }
-
+  const result = await checkForExtensionUpdate(chrome.runtime.getManifest().version);
+  if (result.state === "available") {
     const panel = queryRequired<HTMLElement>("#update-panel");
     const detail = queryRequired<HTMLElement>("#update-detail");
     const link = queryRequired<HTMLAnchorElement>("#download-update");
-    detail.textContent = t("popup.updateDetail", { version: update.version });
-    link.href = update.downloadUrl;
+    detail.textContent = t("popup.updateDetail", { version: result.update.version });
+    link.href = result.update.downloadUrl;
     panel.hidden = false;
-  } catch {
-    // Update checks are optional and must not block the extension popup.
   }
 }
 

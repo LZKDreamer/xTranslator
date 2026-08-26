@@ -94,6 +94,22 @@
           </div>
         </section>
 
+        <section class="settings-panel" aria-labelledby="version-update-title">
+          <h2 id="version-update-title" data-i18n="options.versionUpdate">Version update</h2>
+          <dl class="version-update-details">
+            <div>
+              <dt data-i18n="options.currentVersion">Current version</dt>
+              <dd id="current-version">—</dd>
+            </div>
+            <div>
+              <dt data-i18n="options.latestVersion">Latest version</dt>
+              <dd id="latest-version">—</dd>
+            </div>
+          </dl>
+          <p id="version-update-status" class="status-message" role="status" aria-live="polite"></p>
+          <a id="options-download-update" class="update-link" target="_blank" rel="noreferrer" hidden data-i18n="options.downloadUpdate">Download update</a>
+        </section>
+
       </form>
     </main>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>

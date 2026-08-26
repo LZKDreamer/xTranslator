@@ -5,6 +5,11 @@ export interface ExtensionUpdate {
   downloadUrl: string;
 }
 
+export type ExtensionUpdateCheck =
+  | { state: "available"; update: ExtensionUpdate }
+  | { state: "up-to-date" }
+  | { state: "unavailable" };
+
 function parseVersion(version: string): number[] | null {
   const parts = version.split(".");
   if (parts.length === 0 || parts.length > 4 || parts.some((part) => !/^(?:0|[1-9]\d{0,4})$/u.test(part))) {
@@ -60,4 +65,21 @@ export function getAvailableUpdate(value: unknown, installedVersion: string): Ex
 
   const comparison = compareExtensionVersions(version, installedVersion);
   return comparison !== null && comparison > 0 ? { version, downloadUrl } : null;
+}
+
+export async function checkForExtensionUpdate(
+  installedVersion: string,
+  request: typeof fetch = fetch,
+): Promise<ExtensionUpdateCheck> {
+  try {
+    const response = await request(UPDATE_MANIFEST_URL, { cache: "no-store" });
+    if (!response.ok) {
+      return { state: "unavailable" };
+    }
+
+    const update = getAvailableUpdate(await response.json(), installedVersion);
+    return update ? { state: "available", update } : { state: "up-to-date" };
+  } catch {
+    return { state: "unavailable" };
+  }
 }
