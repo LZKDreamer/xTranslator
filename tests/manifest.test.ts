@@ -9,6 +9,7 @@ interface WebAccessibleResourceRule {
 interface ExtensionManifest {
   default_locale?: string;
   description?: string;
+  host_permissions?: string[];
   name?: string;
   web_accessible_resources?: WebAccessibleResourceRule[];
 }
@@ -38,5 +39,9 @@ describe("extension manifest", () => {
 
     expect(logoRule).toBeDefined();
     expect(logoRule?.matches).toEqual(["https://www.youtube.com/*"]);
+  });
+
+  it("allows update checks through jsDelivr only", () => {
+    expect(manifest.host_permissions).toContain("https://cdn.jsdelivr.net/*");
   });
 });

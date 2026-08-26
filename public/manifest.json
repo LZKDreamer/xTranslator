@@ -39,6 +39,7 @@
   "permissions": ["storage", "contextMenus"],
   "host_permissions": [
     "https://www.youtube.com/*",
+    "https://cdn.jsdelivr.net/*",
     "https://api.deepseek.com/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",

@@ -132,6 +132,19 @@ button {
   color: var(--color-danger);
 }
 
+.update-link {
+  display: inline-block;
+  margin-top: var(--space-8);
+  color: var(--color-accent-violet);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.update-link:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
 .translation-panel {
   margin-top: var(--space-12);
   padding: var(--space-12);

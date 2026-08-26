@@ -50,6 +50,24 @@ pnpm build
 
 源码修改后需要重新执行 `pnpm build`，并在扩展管理页点击“重新加载”。
 
+### 安装发布包
+
+下载与安装包版本对应的 `xTranslator-版本号.zip`，解压后按上面的“在 Chrome 中加载”步骤选择解压目录。扩展弹窗会通过 jsDelivr 检查更新；发现新版本时会提供对应 zip 的下载链接。下载并解压新版后，在 `chrome://extensions` 中重新加载该目录即可完成更新。
+
+### 发布新版本
+
+发布版本前，将 `package.json` 和 `public/manifest.json` 中的 `version` 同步改为相同的 Chrome 扩展版本号（例如 `0.1.1`），然后运行：
+
+```powershell
+pnpm package
+git add public/updates/latest.json releases/xTranslator-0.1.1.zip
+git commit -m "release: v0.1.1"
+git tag v0.1.1
+git push origin main --tags
+```
+
+打包脚本会构建扩展、生成 `releases/xTranslator-版本号.zip`，并更新 jsDelivr 所需的更新清单。安装包和更新清单必须与 tag 一起推送，jsDelivr 下载链接才会生效。GitHub Release 可作为发布说明页使用，但扩展检查和下载均只访问 jsDelivr。
+
 ## 支持的翻译服务
 
 | 服务 | 协议 | 模型来源 |
