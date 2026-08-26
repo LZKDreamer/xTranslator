@@ -8,6 +8,7 @@ import {
   parseProviderSettings,
   parseSubtitleSettings,
   resolveProviderApiKey,
+  resolveProviderModel,
 } from "../src/shared/contracts/settings";
 
 describe("provider settings", () => {
@@ -22,6 +23,7 @@ describe("provider settings", () => {
     ).toEqual({
       provider: { providerId: "deepseek", model: "deepseek-chat" },
       apiKeys: { deepseek: "secret" },
+      providerModels: { deepseek: "deepseek-chat" },
       subtitles: { displayMode: "bilingual" },
       selection: { enabled: true, includeContext: false },
     });
@@ -37,6 +39,7 @@ describe("provider settings", () => {
     ).toEqual({
       provider: { providerId: "deepseek", model: "deepseek-chat" },
       apiKeys: { deepseek: "  secret  " },
+      providerModels: { deepseek: "deepseek-chat" },
       subtitles: { displayMode: "bilingual" },
       selection: { enabled: true, includeContext: false },
     });
@@ -79,17 +82,22 @@ describe("provider settings", () => {
     const settings = parseExtensionSettings({
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { deepseek: "deepseek-secret", openai: "openai-secret" },
+      providerModels: { deepseek: "deepseek-chat", openai: "gpt-4o-mini" },
       subtitles: { displayMode: "bilingual" },
       selection: { enabled: true, includeContext: false },
     })!;
     expect(resolveProviderApiKey(settings)).toBe("openai-secret");
     expect(resolveProviderApiKey(settings, "deepseek")).toBe("deepseek-secret");
     expect(resolveProviderApiKey(settings, "anthropic")).toBe("");
+    expect(resolveProviderModel(settings)).toBe("gpt-4o-mini");
+    expect(resolveProviderModel(settings, "deepseek")).toBe("deepseek-chat");
+    expect(resolveProviderModel(settings, "anthropic")).toBe("");
   });
 
   it("exposes a default provider preset without an api key", () => {
     expect(DEFAULT_SETTINGS.provider.providerId).toBe("deepseek");
     expect(DEFAULT_SETTINGS.apiKeys).toEqual({});
+    expect(DEFAULT_SETTINGS.providerModels).toEqual({});
     expect(resolveProviderApiKey(DEFAULT_SETTINGS)).toBe("");
   });
 
@@ -97,6 +105,7 @@ describe("provider settings", () => {
     expect(parseExtensionSettings({
       provider: { providerId: "deepseek", model: "deepseek-chat" },
       apiKeys: {},
+      providerModels: {},
       subtitles: { displayMode: "bilingual" },
       selection: { includeContext: false },
     })?.selection.enabled).toBe(true);

@@ -8,6 +8,7 @@ export const MESSAGE_TYPE = {
   getVideoTranslationStatus: "get-video-translation-status",
   updateVideoTranslationStatus: "update-video-translation-status",
   translateVideo: "translate-video",
+  translateVideoProgress: "translate-video-progress",
   translateText: "translate-text",
   translateSelectionFromContext: "translate-selection-from-context",
   getCacheStats: "get-cache-stats",
@@ -61,12 +62,22 @@ export interface UpdateVideoTranslationStatusMessage {
 
 export interface TranslateVideoMessage {
   type: typeof MESSAGE_TYPE.translateVideo;
+  runId: string;
   videoId: string;
   videoTitle: string;
-  videoDescription: string;
   sourceTrackFingerprint: string;
   sourceLanguage: string;
   segments: TranslationSourceSegment[];
+}
+
+export interface TranslateVideoProgressMessage {
+  type: typeof MESSAGE_TYPE.translateVideoProgress;
+  runId: string;
+  videoId: string;
+  sourceTrackFingerprint: string;
+  targetLanguage: string;
+  displayMode: CaptionDisplayMode;
+  block: TranslatedBlock;
 }
 
 export type TranslateVideoResponse =
@@ -364,13 +375,13 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
       return status ? { type: MESSAGE_TYPE.updateVideoTranslationStatus, status } : null;
     }
     case MESSAGE_TYPE.translateVideo: {
+      if (typeof value.runId !== "string" || !value.runId) {
+        return null;
+      }
       if (typeof value.videoId !== "string" || !value.videoId) {
         return null;
       }
       if (typeof value.videoTitle !== "string") {
-        return null;
-      }
-      if (typeof value.videoDescription !== "string") {
         return null;
       }
       if (typeof value.sourceTrackFingerprint !== "string" || !value.sourceTrackFingerprint) {
@@ -392,9 +403,9 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
       }
       return {
         type: MESSAGE_TYPE.translateVideo,
+        runId: value.runId,
         videoId: value.videoId,
         videoTitle: value.videoTitle,
-        videoDescription: value.videoDescription,
         sourceTrackFingerprint: value.sourceTrackFingerprint,
         sourceLanguage: value.sourceLanguage,
         segments,
@@ -424,6 +435,24 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
 
 export function isVideoTranslationStatus(value: unknown): value is VideoTranslationStatus {
   return parseVideoTranslationStatus(value) !== null;
+}
+
+export function isTranslateVideoProgressMessage(value: unknown): value is TranslateVideoProgressMessage {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    value.type === MESSAGE_TYPE.translateVideoProgress &&
+    typeof value.runId === "string" &&
+    value.runId.length > 0 &&
+    typeof value.videoId === "string" &&
+    value.videoId.length > 0 &&
+    typeof value.sourceTrackFingerprint === "string" &&
+    value.sourceTrackFingerprint.length > 0 &&
+    typeof value.targetLanguage === "string" &&
+    parseCaptionDisplayMode(value.displayMode) !== null &&
+    parseTranslatedBlock(value.block) !== null
+  );
 }
 
 export function isTranslateTextResponse(value: unknown): value is TranslateTextResponse {
@@ -461,6 +490,8 @@ export function isSettingsMessageResponse(value: unknown): value is SettingsMess
     typeof settings.provider.model === "string" &&
     isRecord(settings.apiKeys) &&
     Object.values(settings.apiKeys).every((key) => typeof key === "string") &&
+    isRecord(settings.providerModels) &&
+    Object.values(settings.providerModels).every((model) => typeof model === "string") &&
     isRecord(settings.subtitles) &&
     parseCaptionDisplayMode(settings.subtitles.displayMode) !== null &&
     isRecord(settings.selection) &&

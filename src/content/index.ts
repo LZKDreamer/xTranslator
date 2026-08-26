@@ -1,7 +1,9 @@
 import { Check, CircleAlert, createElement, LoaderCircle, type IconDefinition } from "../shared/icons";
 import { createBrandMark } from "../shared/brand-assets";
 import {
+  isSettingsMessageResponse,
   isVideoTranslationCacheResponse,
+  isTranslateVideoProgressMessage,
   isTranslateVideoResponse,
   MESSAGE_TYPE,
   type TranslateVideoResponse,
@@ -9,6 +11,7 @@ import {
   type VideoTranslationStatus,
 } from "../shared/contracts/messages";
 import { parseCaptionDisplayMode, type CaptionDisplayMode } from "../shared/contracts/settings";
+import { getProviderContextWindow, getProviderPreset } from "../shared/providers/provider-registry";
 import { createCaptionTrackFingerprint, YouTubeTranscriptParser } from "../shared/youtube/transcript-parser";
 import { requestTranscriptBody } from "./transcript-client";
 import { CaptionOverlayController } from "./caption-overlay";
@@ -25,6 +28,7 @@ import {
   type YouTubePageAnchors,
 } from "../shared/youtube/youtube-page-contract";
 import type { CaptionLoadResult, YouTubeCaptionTrack, YouTubeVideoSnapshot } from "../shared/youtube/youtube-types";
+import { buildTranslationBlocks } from "../shared/translation/block-builder";
 import type { TranslationSourceSegment } from "../shared/translation/translation-types";
 import { CommentTranslationController } from "./comments/comment-controller";
 import { SelectionController } from "./selection/selection-controller";
@@ -34,6 +38,8 @@ const PAGE_UNSUPPORTED_MESSAGE = "当前 YouTube 页面暂不支持读取。";
 const PLAYER_CONTROL_CONFIRMATION_DELAY_MS = 200;
 
 let captionOverlay: CaptionOverlayController | null = null;
+let nextVideoTranslationRunId = 0;
+let activeVideoTranslationRun: { runId: string; videoId: string; sourceTrackFingerprint: string } | null = null;
 
 function readDisplayMode(value: unknown): CaptionDisplayMode | null {
   if (typeof value !== "object" || value === null) {
@@ -147,12 +153,13 @@ async function requestVideoTranslation(
   snapshot: YouTubeVideoSnapshot,
   track: YouTubeCaptionTrack,
   segments: readonly TranslationSourceSegment[],
+  runId: string,
 ): Promise<TranslateVideoResponse> {
   const response = await chrome.runtime.sendMessage({
     type: MESSAGE_TYPE.translateVideo,
+    runId,
     videoId: snapshot.videoId,
     videoTitle: snapshot.title,
-    videoDescription: snapshot.shortDescription,
     sourceTrackFingerprint: createCaptionTrackFingerprint(track),
     sourceLanguage: track.languageCode,
     segments: [...segments],
@@ -161,6 +168,64 @@ async function requestVideoTranslation(
     throw new Error("Invalid xTranslator translate response.");
   }
   return response;
+}
+
+function bindVideoTranslationProgress(): void {
+  if (typeof chrome === "undefined" || !chrome.runtime?.onMessage) {
+    return;
+  }
+  chrome.runtime.onMessage.addListener((message: unknown) => {
+    if (!isTranslateVideoProgressMessage(message)) {
+      return false;
+    }
+    const active = activeVideoTranslationRun;
+    if (
+      !active ||
+      active.runId !== message.runId ||
+      active.videoId !== message.videoId ||
+      active.sourceTrackFingerprint !== message.sourceTrackFingerprint
+    ) {
+      return false;
+    }
+
+    const anchors = findYouTubePageAnchors(document);
+    if (!anchors) {
+      return false;
+    }
+    captionOverlay ??= new CaptionOverlayController(document, anchors.player);
+    captionOverlay.append([message.block]);
+    captionOverlay.setMode(message.displayMode);
+    return false;
+  });
+}
+
+async function resolveTranslationBlockCount(
+  segments: readonly TranslationSourceSegment[],
+  sourceLanguage: string,
+): Promise<number> {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPE.getSettings });
+    if (isSettingsMessageResponse(response)) {
+      const preset = getProviderPreset(response.settings.provider.providerId);
+      if (preset) {
+        const model = response.settings.provider.model.trim();
+        if (!model) {
+          return segments.length;
+        }
+        return buildTranslationBlocks(
+          segments,
+          getProviderContextWindow(preset, model),
+          undefined,
+          undefined,
+          undefined,
+          sourceLanguage,
+        ).length;
+      }
+    }
+  } catch {
+    // Translation will still report its result if settings are temporarily unavailable.
+  }
+  return segments.length;
 }
 
 async function requestCachedVideoTranslation(videoId: string): Promise<VideoTranslationCacheResponse> {
@@ -277,12 +342,16 @@ function mountPlayerControl(
   };
 
   button.addEventListener("click", () => {
+    const runId = `video-${nextVideoTranslationRunId += 1}`;
     setPlayerButtonLabel(button, "翻译中");
     setButtonIcon(documentNode, button, LoaderCircle, true);
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
     void (async () => {
       const finish = (): void => {
+        if (activeVideoTranslationRun?.runId === runId) {
+          activeVideoTranslationRun = null;
+        }
         if (isCurrent()) {
           setPlayerBrandIcon(documentNode, button);
           button.disabled = false;
@@ -317,6 +386,11 @@ function mountPlayerControl(
         return;
       }
 
+      activeVideoTranslationRun = {
+        runId,
+        videoId: snapshot.videoId,
+        sourceTrackFingerprint: createCaptionTrackFingerprint(track),
+      };
       renderStatus(documentNode, status, "info", LoaderCircle, true, "正在读取字幕…");
       await publishVideoTranslationStatus({ phase: "reading-captions", videoId: snapshot.videoId, videoTitle: snapshot.title });
       const result = await loadCaptionTranscript(snapshot, track);
@@ -324,16 +398,17 @@ function mountPlayerControl(
         return;
       }
       if (result.status === "ready") {
-        renderStatus(documentNode, status, "info", LoaderCircle, true, `正在翻译 ${result.segments.length} 段…`);
+        const translationBlockCount = await resolveTranslationBlockCount(result.segments, track.languageCode);
+        renderStatus(documentNode, status, "info", LoaderCircle, true, `正在翻译 ${translationBlockCount} 段…`);
         await publishVideoTranslationStatus({
           phase: "translating",
           videoId: snapshot.videoId,
           videoTitle: snapshot.title,
-          segmentCount: result.segments.length,
+          segmentCount: translationBlockCount,
         });
 
         try {
-          const response = await requestVideoTranslation(snapshot, track, result.segments);
+          const response = await requestVideoTranslation(snapshot, track, result.segments, runId);
           if (!isCurrent()) {
             return;
           }
@@ -442,6 +517,7 @@ class YouTubePageRuntime {
     document.addEventListener("yt-navigate-finish", () => {
       this.navigationVersion += 1;
       this.activeVideoId = null;
+      activeVideoTranslationRun = null;
       this.mountRetryCount = 0;
       this.pendingPlayerControlVideoId = null;
       this.playerControlShownVideoId = null;
@@ -500,6 +576,7 @@ class YouTubePageRuntime {
     this.mountRetryCount = 0;
 
     if (this.activeVideoId !== snapshot.videoId) {
+      activeVideoTranslationRun = null;
       deactivateCaptionOverlay();
       removeExtensionMounts(document);
       this.activeVideoId = snapshot.videoId;
@@ -549,6 +626,7 @@ class YouTubePageRuntime {
 // styled even on pages where the player mount is delayed.
 ensureContentStyle(document);
 bindSettingsChange();
+bindVideoTranslationProgress();
 
 new YouTubePageRuntime().start();
 

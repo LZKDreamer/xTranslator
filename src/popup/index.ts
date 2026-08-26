@@ -23,7 +23,7 @@ function updateConfig(response: SettingsMessageResponse): void {
   const panel = queryRequired<HTMLElement>("#config-panel");
   const preset = getProviderPreset(response.settings.provider.providerId);
   const name = preset?.displayName ?? response.settings.provider.providerId;
-  const model = response.settings.provider.model || preset?.defaultModel || "";
+  const model = response.settings.provider.model;
 
   if (resolveProviderApiKey(response.settings)) {
     detail.textContent = `已连接 ${name}${model ? ` · ${model}` : ""}`;

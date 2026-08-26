@@ -6,9 +6,11 @@
 // text from the reply.
 
 import { getWithRetry, postJsonWithRetry, type HttpFetch } from "./http-client";
+import { readServerSentEvents } from "./sse";
 import type {
   CompletionOptions,
   CompletionResult,
+  CompletionTextDeltaHandler,
   ModelListResult,
   ProviderAdapter,
   ProviderPreset,
@@ -42,6 +44,37 @@ async function readTextContent(response: Response, endpoint: string): Promise<Co
   return text ? { ok: true, text } : { ok: false, error: { ...BAD_RESPONSE } };
 }
 
+async function readStreamingTextContent(
+  response: Response,
+  endpoint: string,
+  onTextDelta: CompletionTextDeltaHandler,
+): Promise<CompletionResult> {
+  if (!response.headers.get("content-type")?.includes("text/event-stream")) {
+    return readTextContent(response, endpoint);
+  }
+
+  let text = "";
+  try {
+    await readServerSentEvents(response, (event) => {
+      if (event.event !== "content_block_delta") {
+        return;
+      }
+      const payload = JSON.parse(event.data) as unknown;
+      if (!isRecord(payload) || !isRecord(payload.delta) || payload.delta.type !== "text_delta" || typeof payload.delta.text !== "string") {
+        return;
+      }
+      text += payload.delta.text;
+      onTextDelta(payload.delta.text);
+    });
+  } catch {
+    console.warn("[xTranslator] LLM streaming response was malformed", { endpoint });
+    return { ok: false, error: { ...BAD_RESPONSE } };
+  }
+
+  const content = text.trim();
+  return content ? { ok: true, text: content } : { ok: false, error: { ...BAD_RESPONSE } };
+}
+
 async function readModelIds(response: Response): Promise<ModelListResult> {
   let payload: unknown;
   try {
@@ -73,6 +106,7 @@ export function createAnthropicAdapter(preset: ProviderPreset, fetchFn: HttpFetc
     async complete(request, options: CompletionOptions): Promise<CompletionResult> {
       const url = `${preset.baseUrl}${preset.requestPath}`;
       const body: Record<string, unknown> = {
+        ...(preset.requestBody ?? {}),
         model: options.model,
         system: request.systemPrompt,
         messages: [{ role: "user", content: request.userPrompt }],
@@ -86,6 +120,25 @@ export function createAnthropicAdapter(preset: ProviderPreset, fetchFn: HttpFetc
       }
 
       return readTextContent(result.response, url);
+    },
+    async completeStream(request, options: CompletionOptions, onTextDelta: CompletionTextDeltaHandler): Promise<CompletionResult> {
+      const url = `${preset.baseUrl}${preset.requestPath}`;
+      const body: Record<string, unknown> = {
+        ...(preset.requestBody ?? {}),
+        model: options.model,
+        system: request.systemPrompt,
+        messages: [{ role: "user", content: request.userPrompt }],
+        ...(options.maxOutputTokens !== undefined ? { max_tokens: options.maxOutputTokens } : {}),
+        ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+        stream: true,
+      };
+
+      const result = await postJsonWithRetry(fetchFn, url, body, headers(options.apiKey));
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+
+      return readStreamingTextContent(result.response, url, onTextDelta);
     },
     async listModels(apiKey: string): Promise<ModelListResult> {
       const url = `${preset.baseUrl}${preset.modelsPath}`;

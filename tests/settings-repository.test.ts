@@ -19,6 +19,7 @@ describe("SettingsRepository", () => {
     await expect(repository.loadSettings()).resolves.toEqual({
       provider: { providerId: "deepseek", model: "" },
       apiKeys: {},
+      providerModels: {},
       subtitles: { displayMode: "bilingual" },
       selection: { enabled: true, includeContext: false },
     });
@@ -29,12 +30,14 @@ describe("SettingsRepository", () => {
     await repository.saveSettings({
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { openai: "secret" },
+      providerModels: { openai: "gpt-4o-mini" },
       subtitles: { displayMode: "translation" },
       selection: { enabled: false, includeContext: true },
     });
     await expect(repository.loadSettings()).resolves.toEqual({
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { openai: "secret" },
+      providerModels: { openai: "gpt-4o-mini" },
       subtitles: { displayMode: "translation" },
       selection: { enabled: false, includeContext: true },
     });

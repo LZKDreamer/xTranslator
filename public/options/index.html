@@ -19,15 +19,16 @@
       <form id="settings-form" class="options-form">
         <section class="settings-panel" aria-labelledby="provider-title">
           <h2 id="provider-title">翻译服务</h2>
-          <p class="help">选择你常用的翻译服务，修改后会自动保存。</p>
+          <p class="help">填写服务密钥并加载模型，三项配置完整后会自动保存。</p>
           <label for="provider-id">翻译服务</label>
           <select id="provider-id" name="provider-id"></select>
           <label for="api-key">服务密钥（API Key）</label>
           <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="api-key-help" />
           <p id="api-key-help" class="help">密钥只保存在本机，用于连接你选择的翻译服务。</p>
+          <button class="secondary-button" id="load-models" type="button" disabled>加载模型</button>
           <label for="model">翻译模型</label>
-          <select id="model" name="model"></select>
-          <p id="model-status" class="status-message" role="status"></p>
+          <select id="model" name="model" aria-describedby="model-status"></select>
+          <p id="model-status" class="status-message" role="status" aria-live="polite"></p>
         </section>
 
         <section class="settings-panel" aria-labelledby="subtitles-title">

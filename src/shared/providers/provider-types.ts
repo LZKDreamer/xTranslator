@@ -13,23 +13,21 @@ export interface ProviderPreset {
   displayName: string;
   kind: ProviderKind;
   baseUrl: string;
-  models: readonly string[];
-  defaultModel: string;
-  contextWindowTokens: number;
-  /** Optional provider/model output limit used to cap generated translations. */
-  maxOutputTokens?: number;
+  /** Static model list for providers without a model discovery endpoint. */
+  models?: readonly string[];
+  /** Exact documented limits for known models. Unknown live models have no limit metadata. */
+  modelLimits?: Readonly<Record<string, ProviderModelLimits>>;
+  /** Provider-specific request fields applied to every completion request. */
+  requestBody?: Readonly<Record<string, unknown>>;
   /** Path appended to `baseUrl` for the chat/completions or messages endpoint. */
   requestPath: string;
   /** Optional path appended to `baseUrl` for listing models (GET). */
   modelsPath?: string;
-  /**
-   * Optional allowlist of model IDs applied to the list returned by
-   * `listModels`. Used by gateways that expose one discoverable `/models`
-   * endpoint but route different model families to different protocols (e.g.
-   * OpenCode Zen): only the models this adapter can actually complete are
-   * surfaced, so the dropdown never offers a model that would fail.
-   */
-  modelAllowlist?: readonly string[];
+}
+
+export interface ProviderModelLimits {
+  contextWindowTokens: number;
+  maxOutputTokens: number;
 }
 
 export interface CompletionRequest {
@@ -43,6 +41,8 @@ export interface CompletionOptions {
   maxOutputTokens?: number;
   temperature?: number;
 }
+
+export type CompletionTextDeltaHandler = (delta: string) => void;
 
 export type ProviderFailureReason =
   | "auth"
@@ -69,5 +69,11 @@ export type ModelListResult =
 export interface ProviderAdapter {
   readonly preset: ProviderPreset;
   complete(request: CompletionRequest, options: CompletionOptions): Promise<CompletionResult>;
+  /** Optional SSE path. The full text is still returned for validation and caching. */
+  completeStream?(
+    request: CompletionRequest,
+    options: CompletionOptions,
+    onTextDelta: CompletionTextDeltaHandler,
+  ): Promise<CompletionResult>;
   listModels(apiKey: string): Promise<ModelListResult>;
 }

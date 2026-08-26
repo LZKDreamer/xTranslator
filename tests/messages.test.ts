@@ -45,12 +45,24 @@ describe("extension messages", () => {
         settings: {
           provider: { providerId: "deepseek", model: "" },
           apiKeys: {},
+          providerModels: {},
           subtitles: { displayMode: "bilingual" },
           selection: { enabled: true, includeContext: false },
         },
         resolvedTargetLocale: "zh-Hans",
       }),
     ).toBe(true);
+    expect(
+      isSettingsMessageResponse({
+        settings: {
+          provider: { providerId: "deepseek", model: "" },
+          apiKeys: {},
+          subtitles: { displayMode: "bilingual" },
+          selection: { enabled: true, includeContext: false },
+        },
+        resolvedTargetLocale: "zh-Hans",
+      }),
+    ).toBe(false);
     expect(isSettingsMessageResponse({ settings: { targetLanguage: 1 }, resolvedTargetLocale: "en" })).toBe(
       false,
     );
@@ -69,9 +81,9 @@ describe("extension messages", () => {
   it("accepts a valid translate-video message and rejects malformed ones", () => {
     const valid = {
       type: MESSAGE_TYPE.translateVideo,
+      runId: "test-run",
       videoId: "a-b-c",
       videoTitle: "Demo",
-      videoDescription: "Demo description",
       sourceTrackFingerprint: "fp",
       sourceLanguage: "en",
       segments: [{ id: "yt-abc", sourceText: "hello", startMs: 0, durationMs: 1000 }],

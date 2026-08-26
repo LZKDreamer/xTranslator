@@ -26,6 +26,13 @@ describe("token estimator", () => {
 });
 
 describe("buildTranslationBlocks", () => {
+  it("uses translation blocks as the user-facing work count", () => {
+    const segments = [segment("a", "hello", 0), segment("b", "world", 1000)];
+
+    expect(segments).toHaveLength(2);
+    expect(buildTranslationBlocks(segments, computeInputTokenBudget(65_536))).toHaveLength(1);
+  });
+
   it("merges adjacent ASR segments into one block with a combined timeline", () => {
     const blocks = buildTranslationBlocks(
       [segment("a", "hello", 0), segment("b", "world", 1000)],

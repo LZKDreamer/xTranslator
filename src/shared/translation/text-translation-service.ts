@@ -8,6 +8,7 @@
 
 import { userFacingProviderMessage } from "../providers/provider-messages";
 import type { ProviderAdapter } from "../providers/provider-types";
+import { getProviderContextWindow, getProviderMaxOutputTokens } from "../providers/provider-registry";
 import { PROMPT_OVERHEAD_TOKENS } from "./chunker";
 import { computeInputTokenBudget } from "./chunker";
 import { TranslationResultValidator } from "./result-validator";
@@ -56,17 +57,21 @@ export class TextTranslationService {
     // text; keep comments to one item per request so that mismatch is impossible.
     const batches = context.singleItemBatches
       ? translatableItems.map((item) => [item])
-      : batchTextItems(translatableItems, context.adapter.preset.contextWindowTokens);
+      : batchTextItems(translatableItems, getProviderContextWindow(context.adapter.preset, context.model));
 
     const translations: Record<string, string> = {};
     const missingIds: string[] = [];
-    const maxOutputTokens = Math.min(
-      MAX_OUTPUT_TOKENS,
-      Math.max(
-        MAX_OUTPUT_FACTOR,
-        computeInputTokenBudget(context.adapter.preset.contextWindowTokens) + PROMPT_OVERHEAD_TOKENS,
-      ),
-    );
+    const documentedMaxOutputTokens = getProviderMaxOutputTokens(context.adapter.preset, context.model);
+    const maxOutputTokens = documentedMaxOutputTokens === undefined
+      ? undefined
+      : Math.min(
+          MAX_OUTPUT_TOKENS,
+          documentedMaxOutputTokens,
+          Math.max(
+            MAX_OUTPUT_FACTOR,
+            computeInputTokenBudget(getProviderContextWindow(context.adapter.preset, context.model)) + PROMPT_OVERHEAD_TOKENS,
+          ),
+        );
 
     for (let index = 0; index < batches.length; index += 1) {
       const batch = batches[index]!;
@@ -105,23 +110,24 @@ export class TextTranslationService {
   private async translateBatch(
     batch: readonly TextTranslationItem[],
     context: TextTranslationContext,
-    maxOutputTokens: number,
+    maxOutputTokens: number | undefined,
   ): Promise<
     | { ok: true; translations: { id: string; translatedText: string }[]; missingIds: string[] }
     | { ok: false; errorMessage: string }
   > {
-    const completion = await context.adapter.complete(
-      {
-        systemPrompt: buildTextSystemPrompt(context.targetLanguage),
-        userPrompt: buildTextUserPrompt(batch),
-      },
-      {
-        model: context.model,
-        apiKey: context.apiKey,
-        maxOutputTokens,
-        temperature: DEFAULT_TEMPERATURE,
-      },
-    );
+    const request = {
+      systemPrompt: buildTextSystemPrompt(context.targetLanguage),
+      userPrompt: buildTextUserPrompt(batch),
+    };
+    const options = {
+      model: context.model,
+      apiKey: context.apiKey,
+      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+      temperature: DEFAULT_TEMPERATURE,
+    };
+    const completion = context.adapter.completeStream
+      ? await context.adapter.completeStream(request, options, () => undefined)
+      : await context.adapter.complete(request, options);
 
     if (!completion.ok) {
       return { ok: false, errorMessage: userFacingProviderMessage(completion.error.reason) };

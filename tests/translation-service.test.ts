@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { VideoTranslationService } from "../src/background/translation-service";
 import { buildTranslationBlocks } from "../src/shared/translation/block-builder";
-import { getProviderPreset } from "../src/shared/providers/provider-registry";
+import { getProviderContextWindow, getProviderPreset } from "../src/shared/providers/provider-registry";
 import type { CompletionRequest, CompletionResult, ProviderAdapter, ProviderPreset } from "../src/shared/providers/provider-types";
 import type { TranslateVideoMessage } from "../src/shared/contracts/messages";
 import type { VideoTranslationCache, VideoCacheStats } from "../src/shared/storage/video-translation-cache";
@@ -11,9 +11,9 @@ import type { TranslatedBlock, TranslationBlockInput, TranslationSourceSegment, 
 function makeRequest(segments: TranslationSourceSegment[], videoId = "v1"): TranslateVideoMessage {
   return {
     type: "translate-video",
+    runId: "test-run",
     videoId,
     videoTitle: "Demo video",
-    videoDescription: "Demo description",
     sourceTrackFingerprint: "fp",
     sourceLanguage: "en",
     segments,
@@ -70,14 +70,14 @@ function makeAdapter(
   };
 }
 
-function context(adapter: ProviderAdapter) {
+function context(adapter: ProviderAdapter, model = "test-model") {
   return {
     sourceLanguage: "en",
     targetLanguage: "zh-Hans",
     displayMode: "bilingual" as const,
     adapter,
     apiKey: "secret",
-    model: "deepseek-chat",
+    model,
   };
 }
 
@@ -103,7 +103,7 @@ function idsFromPrompt(prompt: string): string[] {
 describe("VideoTranslationService", () => {
   it("serves all blocks from cache without calling the provider", async () => {
     const cache = new MemoryCache();
-    const blocks = buildTranslationBlocks(adjacentSegments, preset.contextWindowTokens);
+    const blocks = buildTranslationBlocks(adjacentSegments, getProviderContextWindow(preset, "test-model"));
     const key = cacheKey();
     cache.entries.set(key, {
       key,
@@ -169,7 +169,7 @@ describe("VideoTranslationService", () => {
 
   it("reads the same video cache regardless of the active provider or model", async () => {
     const cache = new MemoryCache();
-    const blocks = buildTranslationBlocks(adjacentSegments, preset.contextWindowTokens);
+    const blocks = buildTranslationBlocks(gappedSegments, getProviderContextWindow(preset, "test-model"));
     const key = cacheKey();
     cache.entries.set(key, {
       key,
@@ -184,23 +184,28 @@ describe("VideoTranslationService", () => {
     });
 
     let calls = 0;
+    const agnes = getProviderPreset("agnes")!;
     const adapter = makeAdapter(async (req) => {
       calls += 1;
       return { ok: true, text: idsFromPrompt(req.userPrompt).map((id) => line(id, "DeepSeek result")).join("\n") };
-    });
-    const result = await new VideoTranslationService(cache).translate(makeRequest(adjacentSegments), context(adapter));
+    }, agnes);
+    const result = await new VideoTranslationService(cache).translate(
+      makeRequest(gappedSegments),
+      context(adapter, "agnes-2.5-flash"),
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.fromCache).toBe(true);
+      expect(result.fromCache).toBe(false);
       expect(result.blocks[0]?.translatedText).toBe("Agnes cached");
+      expect(result.blocks[1]?.translatedText).toBe("DeepSeek result");
     }
-    expect(calls).toBe(0);
+    expect(calls).toBe(1);
   });
 
   it("does not reuse a cache entry from another caption track", async () => {
     const cache = new MemoryCache();
-    const blocks = buildTranslationBlocks(adjacentSegments, preset.contextWindowTokens);
+    const blocks = buildTranslationBlocks(adjacentSegments, getProviderContextWindow(preset, "test-model"));
     const key = cacheKey();
     cache.entries.set(key, {
       key,
@@ -233,7 +238,9 @@ describe("VideoTranslationService", () => {
 
   it("translates uncached blocks and writes progress to the cache", async () => {
     const cache = new MemoryCache();
+    let receivedPrompt = "";
     const adapter = makeAdapter(async (req) => {
+      receivedPrompt = req.userPrompt;
       const ids = idsFromPrompt(req.userPrompt);
       return { ok: true, text: ids.map((id) => line(id, "译文：" + id)).join("\n") };
     });
@@ -242,6 +249,8 @@ describe("VideoTranslationService", () => {
     const result = await service.translate(makeRequest(adjacentSegments), context(adapter));
 
     expect(result.ok).toBe(true);
+    expect(receivedPrompt).toContain('title "Demo video"');
+    expect(receivedPrompt).not.toContain("description");
     if (result.ok) {
       expect(result.fromCache).toBe(false);
       expect(result.blocks).toHaveLength(1);
@@ -292,6 +301,32 @@ describe("VideoTranslationService", () => {
     expect(call).toBe(2);
   });
 
+  it("emits validated blocks while a streaming provider response is arriving", async () => {
+    const cache = new MemoryCache();
+    const adapter: ProviderAdapter = {
+      preset,
+      complete: async () => ({ ok: false, error: { reason: "bad-response", message: "not used" } }),
+      completeStream: async (request, _options, onTextDelta) => {
+        const text = idsFromPrompt(request.userPrompt).map((id) => line(id, "流式译文"));
+        for (const item of text) {
+          onTextDelta(item + "\n");
+        }
+        return { ok: true, text: text.join("\n") };
+      },
+      listModels: async () => ({ ok: true, models: [] }),
+    };
+    const progress: TranslatedBlock[] = [];
+
+    const result = await new VideoTranslationService(cache).translate(
+      makeRequest(gappedSegments),
+      context(adapter),
+      (block) => progress.push(block),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(progress.map((block) => block.translatedText)).toEqual(["流式译文", "流式译文"]);
+  });
+
   it("retries an empty spoken translation separately instead of displaying source only", async () => {
     const cache = new MemoryCache();
     let call = 0;
@@ -330,7 +365,7 @@ describe("VideoTranslationService", () => {
 
   it("retranslates an empty spoken translation from an older cache entry", async () => {
     const cache = new MemoryCache();
-    const blocks = buildTranslationBlocks(gappedSegments, preset.contextWindowTokens);
+    const blocks = buildTranslationBlocks(gappedSegments, getProviderContextWindow(preset, "test-model"));
     const key = cacheKey();
     cache.entries.set(key, {
       key,
@@ -371,7 +406,7 @@ describe("VideoTranslationService", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.blocks.map((block) => block.id)).toEqual(
-        buildTranslationBlocks(gappedSegments, preset.contextWindowTokens).map((block) => block.id),
+        buildTranslationBlocks(gappedSegments, getProviderContextWindow(preset, "test-model")).map((block) => block.id),
       );
       expect(result.blocks.map((block) => block.segmentIds)).toEqual([["yt-aa"], ["yt-bb"]]);
       expect(result.blocks.every((block) => block.translatedText.startsWith("译文"))).toBe(true);
@@ -393,7 +428,10 @@ describe("VideoTranslationService", () => {
 
   it("persists completed batches and returns them for a resumable partial failure", async () => {
     const cache = new MemoryCache();
-    const smallBatchPreset: ProviderPreset = { ...preset, contextWindowTokens: 620 };
+    const smallBatchPreset: ProviderPreset = {
+      ...preset,
+      modelLimits: { "test-model": { contextWindowTokens: 620, maxOutputTokens: 384_000 } },
+    };
     let calls = 0;
     const adapter = makeAdapter(async (req) => {
       calls += 1;
@@ -403,7 +441,7 @@ describe("VideoTranslationService", () => {
       return { ok: true, text: idsFromPrompt(req.userPrompt).map((id) => line(id, "已完成")).join("\n") };
     }, smallBatchPreset);
 
-    const blocks = buildTranslationBlocks(gappedSegments, smallBatchPreset.contextWindowTokens);
+    const blocks = buildTranslationBlocks(gappedSegments, getProviderContextWindow(smallBatchPreset, "test-model"));
     expect(blocks).toHaveLength(2);
 
     const result = await new VideoTranslationService(cache).translate(makeRequest(gappedSegments), context(adapter));
@@ -434,6 +472,6 @@ describe("VideoTranslationService", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(requestedOutputTokens).toBe(65_536);
+    expect(requestedOutputTokens).toBe(512);
   });
 });

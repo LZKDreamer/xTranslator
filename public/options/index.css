@@ -260,6 +260,16 @@ button:focus-visible {
   transform: translateY(-1px);
 }
 
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+#load-models {
+  justify-self: start;
+}
+
 .status-message[data-state="error"] {
   color: var(--color-danger);
 }

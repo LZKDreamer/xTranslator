@@ -26,11 +26,14 @@ export interface ExtensionSettings {
   provider: ProviderSettings;
   /** API keys keyed by provider id. Kept per-provider so switching providers restores the saved key. */
   apiKeys: Record<string, string>;
+  /** Last successfully selected model keyed by provider id. */
+  providerModels: Record<string, string>;
   subtitles: SubtitleSettings;
   selection: SelectionSettings;
 }
 
 export const DEFAULT_API_KEYS: Readonly<Record<string, string>> = {};
+export const DEFAULT_PROVIDER_MODELS: Readonly<Record<string, string>> = {};
 
 export const DEFAULT_PROVIDER_SETTINGS: Readonly<ProviderSettings> = {
   providerId: DEFAULT_PROVIDER_ID,
@@ -49,6 +52,7 @@ export const DEFAULT_SELECTION_SETTINGS: Readonly<SelectionSettings> = {
 export const DEFAULT_SETTINGS: Readonly<ExtensionSettings> = {
   provider: { ...DEFAULT_PROVIDER_SETTINGS },
   apiKeys: { ...DEFAULT_API_KEYS },
+  providerModels: { ...DEFAULT_PROVIDER_MODELS },
   subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
   selection: { ...DEFAULT_SELECTION_SETTINGS },
 };
@@ -140,6 +144,32 @@ export function resolveProviderApiKey(
   return settings.apiKeys[providerId] ?? "";
 }
 
+export function resolveProviderModel(
+  settings: ExtensionSettings,
+  providerId: string = settings.provider.providerId,
+): string {
+  return settings.providerModels[providerId] ??
+    (providerId === settings.provider.providerId ? settings.provider.model : "");
+}
+
+export function parseProviderModels(value: unknown): Record<string, string> | null {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const models: Record<string, string> = {};
+  for (const [providerId, model] of Object.entries(value)) {
+    if (typeof model !== "string") {
+      return null;
+    }
+    models[providerId] = model.trim();
+  }
+  return models;
+}
+
 export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
   if (!isRecord(value)) {
     return null;
@@ -185,6 +215,15 @@ export function parseExtensionSettings(value: unknown): ExtensionSettings | null
     }
   }
 
+  const providerModels = parseProviderModels(value.providerModels);
+  if (!providerModels) {
+    return null;
+  }
+  if (provider.model && providerModels[provider.providerId] === undefined) {
+    // Migrate settings written before models were remembered per provider.
+    providerModels[provider.providerId] = provider.model;
+  }
+
   const subtitles = parseSubtitleSettings(value.subtitles);
   if (!subtitles) {
     return null;
@@ -195,5 +234,5 @@ export function parseExtensionSettings(value: unknown): ExtensionSettings | null
     return null;
   }
 
-  return { provider, apiKeys, subtitles, selection };
+  return { provider, apiKeys, providerModels, subtitles, selection };
 }

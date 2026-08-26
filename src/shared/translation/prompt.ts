@@ -41,7 +41,7 @@ export function buildSystemPrompt(sourceLanguage: string, targetLanguage: string
     "11. Remove empty spoken fillers or immediate repetitions only when they add no meaning; keep any filler that expresses hesitation, attitude or a meaningful repetition.",
     "12. Prefer one visual subtitle line; use at most two natural lines for a genuinely long block, breaking at a clause boundary rather than in the middle of a phrase.",
     "13. If the source ends mid-sentence, preserve that incomplete ending; do not complete it with words from memory or from another block.",
-    "14. Fix an automatic-caption mistake only when the correction is certain from the current source, title or description; never invent names, numbers, facts, events or timing.",
+    "14. Fix an automatic-caption mistake only when the correction is certain from the current source or title; never invent names, numbers, facts, events or timing.",
     "15. Do not return, infer or modify timestamps. The application owns all timing.",
     "16. If a block has no spoken content, return an empty text value: {\"id\":\"...\",\"text\":\"\"}.",
     "17. Japanese, Korean and other ASR tracks may have no punctuation; treat raw cue boundaries as timing hints, not sentence boundaries, and use only the source text inside the current block.",
@@ -51,7 +51,6 @@ export function buildSystemPrompt(sourceLanguage: string, targetLanguage: string
 
 export interface VideoPromptContext {
   title?: string;
-  description?: string;
 }
 
 export function buildUserPrompt(
@@ -66,9 +65,6 @@ export function buildUserPrompt(
   const metadata: string[] = [];
   if (context.title) {
     metadata.push(`title "${escapeSourceText(context.title)}"`);
-  }
-  if (context.description) {
-    metadata.push(`description "${escapeSourceText(context.description)}"`);
   }
   const metadataText = metadata.length > 0 ? `Video metadata (read-only context):\n${metadata.join("\n")}\n\n` : "";
   return `${metadataText}Translate each numbered block. Reply with one JSON object per line:\n\n${lines.join("\n")}`;

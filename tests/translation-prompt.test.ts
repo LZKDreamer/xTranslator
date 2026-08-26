@@ -39,9 +39,9 @@ describe("translation prompt", () => {
   });
 
   it("includes video metadata without including neighboring caption text", () => {
-    const user = buildUserPrompt([blocks[0]!], { title: "Video title", description: "Video description" });
+    const user = buildUserPrompt([blocks[0]!], { title: "Video title" });
     expect(user).toContain('title "Video title"');
-    expect(user).toContain('description "Video description"');
+    expect(user).not.toContain("description");
     expect(user).not.toContain("context-before");
     expect(user).not.toContain("context-after");
   });

@@ -24,7 +24,7 @@ import {
   createChromeVideoTranslationRepository,
   type VideoTranslationRepository,
 } from "../shared/storage/video-translation-cache";
-import { VideoTranslationService } from "./translation-service";
+import { VideoTranslationService, type BlockProgressWriter } from "./translation-service";
 
 async function getSettingsResponse(): Promise<SettingsMessageResponse> {
   const settings = await createChromeSettingsRepository().loadSettings();
@@ -80,7 +80,7 @@ function createTranslationService(): VideoTranslationService {
   return new VideoTranslationService(getVideoTranslationRepository());
 }
 
-async function handleTranslateVideo(message: TranslateVideoMessage): Promise<TranslateVideoResponse> {
+async function handleTranslateVideo(message: TranslateVideoMessage, tabId?: number): Promise<TranslateVideoResponse> {
   const { settings, resolvedTargetLocale } = await getSettingsResponse();
   if (!shouldTranslateText("", resolvedTargetLocale, message.sourceLanguage)) {
     return {
@@ -104,8 +104,25 @@ async function handleTranslateVideo(message: TranslateVideoMessage): Promise<Tra
     return { ok: false, errorMessage: `暂时无法识别翻译服务：${settings.provider.providerId}` };
   }
 
-  const model = settings.provider.model.trim() || preset.defaultModel;
+  const model = settings.provider.model.trim();
+  if (!model) {
+    return { ok: false, errorMessage: "尚未选择翻译模型，请先打开设置加载并选择模型。" };
+  }
   const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
+
+  const onBlockProgress: BlockProgressWriter | undefined = tabId === undefined
+    ? undefined
+    : (block) => {
+        void chrome.tabs.sendMessage(tabId, {
+          type: MESSAGE_TYPE.translateVideoProgress,
+          runId: message.runId,
+          videoId: message.videoId,
+          sourceTrackFingerprint: message.sourceTrackFingerprint,
+          targetLanguage: resolvedTargetLocale,
+          displayMode: settings.subtitles.displayMode,
+          block,
+        }).catch(() => undefined);
+      };
 
   return createTranslationService().translate(message, {
     sourceLanguage: message.sourceLanguage,
@@ -114,7 +131,7 @@ async function handleTranslateVideo(message: TranslateVideoMessage): Promise<Tra
     adapter,
     apiKey,
     model,
-  });
+  }, onBlockProgress);
 }
 
 async function handleGetVideoTranslationCache(message: { videoId: string }): Promise<VideoTranslationCacheResponse> {
@@ -160,7 +177,10 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
     return { ok: false, errorMessage: `暂时无法识别翻译服务：${settings.provider.providerId}` };
   }
 
-  const model = settings.provider.model.trim() || preset.defaultModel;
+  const model = settings.provider.model.trim();
+  if (!model) {
+    return { ok: false, errorMessage: "尚未选择翻译模型，请先打开设置加载并选择模型。" };
+  }
   const adapter = createProviderAdapter(preset, (input, init) => fetch(input, init));
 
   const run = await new TextTranslationService().translate(message.items, {
@@ -295,7 +315,7 @@ if (typeof chrome !== "undefined") {
         }
         return false;
       case "translate-video":
-        void handleTranslateVideo(parsedMessage)
+        void handleTranslateVideo(parsedMessage, sender.tab?.id)
           .then(sendResponse)
           .catch(() => reportAsyncFailure(sendResponse, "视频翻译失败，请重试。"));
         return true;

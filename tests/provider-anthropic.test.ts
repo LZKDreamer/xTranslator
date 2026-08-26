@@ -44,6 +44,29 @@ describe("Anthropic Messages adapter", () => {
     expect(body.messages).toHaveLength(1);
   });
 
+  it("reads Anthropic text deltas from an SSE response", async () => {
+    const events = [
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你"}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"好"}}\n\n',
+    ];
+    const { adapter, calls } = capturingAdapter(() => new Response(events.join(""), {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    }));
+    const deltas: string[] = [];
+    const result = await adapter.completeStream?.(
+      { systemPrompt: "system", userPrompt: "user" },
+      { model: "claude-haiku-4-5-20251001", apiKey: "secret", maxOutputTokens: 512 },
+      (delta) => deltas.push(delta),
+    );
+
+    expect(result).toEqual({ ok: true, text: "你好" });
+    expect(deltas).toEqual(["你", "好"]);
+    const body = JSON.parse(String(calls[0]!.init.body)) as { stream: boolean; system: string };
+    expect(body.stream).toBe(true);
+    expect(body.system).toBe("system");
+  });
+
   it("concatenates multiple text blocks", async () => {
     const { adapter } = capturingAdapter(() =>
       jsonResponse({ content: [{ type: "text", text: "你" }, { type: "text", text: "好" }] }),

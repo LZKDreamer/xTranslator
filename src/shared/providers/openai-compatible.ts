@@ -6,9 +6,11 @@
 // string; it never interprets the semantics of the reply.
 
 import { getWithRetry, postJsonWithRetry, type HttpFetch } from "./http-client";
+import { readServerSentEvents } from "./sse";
 import type {
   CompletionOptions,
   CompletionResult,
+  CompletionTextDeltaHandler,
   ModelListResult,
   ProviderAdapter,
   ProviderPreset,
@@ -44,6 +46,42 @@ async function readContent(response: Response, endpoint: string): Promise<Comple
   return content ? { ok: true, text: content } : { ok: false, error: { ...BAD_RESPONSE } };
 }
 
+async function readStreamingContent(
+  response: Response,
+  endpoint: string,
+  onTextDelta: CompletionTextDeltaHandler,
+): Promise<CompletionResult> {
+  if (!response.headers.get("content-type")?.includes("text/event-stream")) {
+    return readContent(response, endpoint);
+  }
+
+  let text = "";
+  try {
+    await readServerSentEvents(response, (event) => {
+      if (event.data === "[DONE]") {
+        return;
+      }
+
+      const payload = JSON.parse(event.data) as unknown;
+      if (!isRecord(payload) || !Array.isArray(payload.choices)) {
+        return;
+      }
+      const first = payload.choices[0];
+      if (!isRecord(first) || !isRecord(first.delta) || typeof first.delta.content !== "string") {
+        return;
+      }
+      text += first.delta.content;
+      onTextDelta(first.delta.content);
+    });
+  } catch {
+    console.warn("[xTranslator] LLM streaming response was malformed", { endpoint });
+    return { ok: false, error: { ...BAD_RESPONSE } };
+  }
+
+  const content = text.trim();
+  return content ? { ok: true, text: content } : { ok: false, error: { ...BAD_RESPONSE } };
+}
+
 async function readModelIds(response: Response): Promise<ModelListResult> {
   let payload: unknown;
   try {
@@ -64,21 +102,23 @@ async function readModelIds(response: Response): Promise<ModelListResult> {
 }
 
 export function createOpenAiAdapter(preset: ProviderPreset, fetchFn: HttpFetch): ProviderAdapter {
+  const buildBody = (request: { systemPrompt: string; userPrompt: string }, options: CompletionOptions, stream: boolean): Record<string, unknown> => ({
+    ...(preset.requestBody ?? {}),
+    model: options.model,
+    messages: [
+      { role: "system", content: request.systemPrompt },
+      { role: "user", content: request.userPrompt },
+    ],
+    ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+    ...(options.maxOutputTokens !== undefined ? { max_tokens: options.maxOutputTokens } : {}),
+    ...(stream ? { stream: true } : {}),
+  });
+
   return {
     preset,
     async complete(request, options: CompletionOptions): Promise<CompletionResult> {
       const url = `${preset.baseUrl}${preset.requestPath}`;
-      const body: Record<string, unknown> = {
-        model: options.model,
-        messages: [
-          { role: "system", content: request.systemPrompt },
-          { role: "user", content: request.userPrompt },
-        ],
-        ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-        ...(options.maxOutputTokens !== undefined ? { max_tokens: options.maxOutputTokens } : {}),
-      };
-
-      const result = await postJsonWithRetry(fetchFn, url, body, {
+      const result = await postJsonWithRetry(fetchFn, url, buildBody(request, options, false), {
         "content-type": "application/json",
         authorization: `Bearer ${options.apiKey}`,
       });
@@ -88,9 +128,21 @@ export function createOpenAiAdapter(preset: ProviderPreset, fetchFn: HttpFetch):
 
       return readContent(result.response, url);
     },
+    async completeStream(request, options: CompletionOptions, onTextDelta: CompletionTextDeltaHandler): Promise<CompletionResult> {
+      const url = `${preset.baseUrl}${preset.requestPath}`;
+      const result = await postJsonWithRetry(fetchFn, url, buildBody(request, options, true), {
+        "content-type": "application/json",
+        authorization: `Bearer ${options.apiKey}`,
+      });
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+
+      return readStreamingContent(result.response, url, onTextDelta);
+    },
     async listModels(apiKey: string): Promise<ModelListResult> {
       if (!preset.modelsPath) {
-        return preset.models.length > 0
+        return preset.models && preset.models.length > 0
           ? { ok: true, models: [...preset.models] }
           : { ok: false, error: { ...BAD_RESPONSE } };
       }
@@ -102,11 +154,7 @@ export function createOpenAiAdapter(preset: ProviderPreset, fetchFn: HttpFetch):
         return { ok: false, error: result.error };
       }
       const listed = await readModelIds(result.response);
-      if (!listed.ok || !preset.modelAllowlist) {
-        return listed;
-      }
-      const allowed = new Set(preset.modelAllowlist);
-      return { ok: true, models: listed.models.filter((model) => allowed.has(model)) };
+      return listed;
     },
   };
 }

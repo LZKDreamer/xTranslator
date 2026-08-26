@@ -10,7 +10,7 @@
 - 长视频分批翻译：已完成的字幕块会增量写入本地缓存，失败后可以只重试缺失部分。
 - 评论翻译：翻译当前已经由 YouTube 渲染的可见评论，也支持已展开的评论线程。
 - 划词翻译：选中网页文本即可翻译，也可以通过右键菜单触发；支持可选上下文。
-- 多种翻译服务：内置 DeepSeek、OpenAI、Anthropic、Agnes AI 和 OpenCode Zen 配置。
+- 多种翻译服务：内置 DeepSeek、OpenAI、Anthropic 和 Agnes AI 配置；除 Agnes AI 外，模型列表从服务商接口动态获取。
 - 自动目标语言：跟随浏览器界面语言，不需要单独设置目标语言。
 - 本地缓存管理：翻译结果保存在 IndexedDB，可按视频或全部清理。
 - 隐私优先：API Key 只保存在扩展的本地存储中，不写入网页、同步存储或日志。
@@ -45,22 +45,23 @@ pnpm build
 2. 开启右上角的“开发者模式”。
 3. 点击“加载已解压的扩展程序”。
 4. 选择本项目根目录。
-5. 打开扩展的设置页，选择翻译服务、填写 API Key，并选择模型。
+5. 打开扩展的设置页，选择翻译服务并填写 API Key，点击“加载模型”后选择模型；服务商、API Key 和模型三项完整后会自动保存。
 6. 打开 YouTube 视频页面，使用播放器中的翻译入口、评论区入口或划词浮层。
 
 源码修改后需要重新执行 `pnpm build`，并在扩展管理页点击“重新加载”。
 
 ## 支持的翻译服务
 
-| 服务 | 协议 | 默认模型 |
+| 服务 | 协议 | 模型来源 |
 | --- | --- | --- |
-| DeepSeek | OpenAI-compatible | `deepseek-chat` |
-| OpenAI | OpenAI-compatible | `gpt-4o-mini` |
-| Anthropic | Anthropic Messages | `claude-3-5-haiku-latest` |
-| Agnes AI | OpenAI-compatible | `agnes-2.5-flash` |
-| OpenCode Zen | OpenAI-compatible 模型子集 | `deepseek-v4-flash` |
+| DeepSeek | OpenAI-compatible | `/models` 动态获取 |
+| OpenAI | OpenAI-compatible | `/v1/models` 动态获取 |
+| Anthropic | Anthropic Messages | `/v1/models` 动态获取 |
+| Agnes AI | OpenAI-compatible | 静态：`agnes-2.5-flash` |
 
-模型列表会根据服务配置和 API 返回动态更新。不同服务的计费、限流、数据保留和隐私政策不同，请在使用前阅读对应服务商的条款。翻译请求会发送到你在设置页选择的服务。
+模型列表会根据服务配置和 API 返回动态更新；切换已配置的服务商时会恢复该服务商自己的 API Key 和模型。不同服务的计费、限流、数据保留和隐私政策不同，请在使用前阅读对应服务商的条款。翻译请求会发送到你在设置页选择的服务。
+
+设置页的字幕模式、划词翻译开关和上下文选项独立自动保存。API Key 变更后必须重新加载模型，未完成的翻译服务配置不会覆盖当前已保存配置。
 
 ## 开发
 

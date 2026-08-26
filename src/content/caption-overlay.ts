@@ -78,6 +78,16 @@ export class CaptionOverlayController {
     this.syncOverlay();
   }
 
+  /** Merge blocks received from a streaming translation response. */
+  public append(blocks: readonly TranslatedBlock[]): void {
+    const merged = new Map(this.blocks.map((block) => [block.id, block]));
+    for (const block of toTimedBlocks(blocks)) {
+      merged.set(block.id, block);
+    }
+    this.blocks = [...merged.values()].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+    this.syncOverlay();
+  }
+
   public setMode(mode: CaptionDisplayMode): void {
     this.mode = mode;
     this.syncOverlay();

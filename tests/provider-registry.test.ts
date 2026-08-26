@@ -1,19 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
   createProviderAdapter,
+  getProviderContextWindow,
+  getProviderMaxOutputTokens,
   getProviderPreset,
   listProviderPresets,
   PROVIDER_PRESETS,
+  UNKNOWN_MODEL_CONTEXT_WINDOW_TOKENS,
 } from "../src/shared/providers/provider-registry";
 
 describe("provider registry", () => {
-  it("exposes a DeepSeek preset as OpenAI-compatible by default", () => {
+  it("exposes a DeepSeek preset as OpenAI-compatible with runtime model discovery", () => {
     const deepseek = getProviderPreset("deepseek");
     expect(deepseek).not.toBeNull();
     expect(deepseek?.kind).toBe("openai-compatible");
     expect(deepseek?.baseUrl).toBe("https://api.deepseek.com");
-    expect(deepseek?.defaultModel).toBe("deepseek-chat");
-    expect(deepseek?.models).toContain("deepseek-chat");
+    expect(deepseek?.models).toBeUndefined();
+
+    for (const providerId of ["openai", "anthropic"]) {
+      const preset = getProviderPreset(providerId);
+      expect(preset?.models).toBeUndefined();
+    }
   });
 
   it("exposes an Anthropic Messages preset", () => {
@@ -22,16 +29,31 @@ describe("provider registry", () => {
     expect(anthropic?.baseUrl).toBe("https://api.anthropic.com");
   });
 
+  it("discovers models through provider APIs except for the static Agnes catalog", () => {
+    expect(getProviderPreset("deepseek")?.modelsPath).toBe("/models");
+    expect(getProviderPreset("openai")?.modelsPath).toBe("/v1/models");
+    expect(getProviderPreset("anthropic")?.modelsPath).toBe("/v1/models");
+    expect(getProviderPreset("agnes")?.modelsPath).toBeUndefined();
+  });
+
   it("exposes Agnes 2.5 Flash through its OpenAI-compatible API", () => {
     const agnes = getProviderPreset("agnes");
     expect(agnes?.displayName).toBe("Agnes AI");
     expect(agnes?.kind).toBe("openai-compatible");
     expect(agnes?.baseUrl).toBe("https://apihub.agnes-ai.com/v1");
     expect(agnes?.requestPath).toBe("/chat/completions");
-    expect(agnes?.defaultModel).toBe("agnes-2.5-flash");
     expect(agnes?.models).toEqual(["agnes-2.5-flash"]);
-    expect(agnes?.contextWindowTokens).toBe(512_000);
-    expect(agnes?.maxOutputTokens).toBe(65_536);
+    expect(getProviderContextWindow(agnes!, "agnes-2.5-flash")).toBe(512_000);
+    expect(getProviderMaxOutputTokens(agnes!, "agnes-2.5-flash")).toBe(65_536);
+  });
+
+  it("resolves documented per-model limits and leaves unknown gateway output limits unset", () => {
+    const deepseek = getProviderPreset("deepseek")!;
+    expect(getProviderContextWindow(deepseek, "deepseek-v4-flash")).toBe(1_000_000);
+    expect(getProviderMaxOutputTokens(deepseek, "deepseek-v4-flash")).toBe(384_000);
+
+    expect(getProviderMaxOutputTokens(deepseek, "new-model-from-provider-api")).toBeUndefined();
+    expect(getProviderContextWindow(deepseek, "new-model-from-provider-api")).toBe(UNKNOWN_MODEL_CONTEXT_WINDOW_TOKENS);
   });
 
   it("uses Agnes's documented model list without an undocumented discovery request", async () => {
@@ -49,19 +71,6 @@ describe("provider registry", () => {
     const adapter = createProviderAdapter(preset!, () => Promise.reject(new Error("no network")));
     expect(adapter.preset.id).toBe("openai");
     expect(adapter.preset.kind).toBe("openai-compatible");
-  });
-
-  it("exposes an OpenCode Zen preset limited to OpenAI-compatible models", () => {
-    const opencode = getProviderPreset("opencode");
-    expect(opencode).not.toBeNull();
-    expect(opencode?.kind).toBe("openai-compatible");
-    expect(opencode?.baseUrl).toBe("https://opencode.ai/zen/v1");
-    expect(opencode?.requestPath).toBe("/chat/completions");
-    expect(opencode?.modelsPath).toBe("/models");
-    expect(opencode?.defaultModel).toBe("deepseek-v4-flash");
-    expect(opencode?.modelAllowlist).toContain("deepseek-v4-flash");
-    // Models that OpenCode Zen serves through other protocols must not be offered.
-    expect(opencode?.modelAllowlist).not.toContain("gpt-5");
   });
 
   it("lists at least the three built-in presets", () => {

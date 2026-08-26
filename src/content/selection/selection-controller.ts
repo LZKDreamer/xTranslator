@@ -5,7 +5,7 @@
 // (复制 / 关闭), reachable through the pill and through the right-click context
 // menu (which the service worker forwards as a message). The original text node
 // is never modified: the pill and result are always separate overlays appended to
-// the document body. Esc closes the overlay.
+// the document body. Esc closes the active overlay.
 
 import { isSettingsMessageResponse, isTranslateTextResponse, MESSAGE_TYPE } from "../../shared/contracts/messages";
 import { Check, CircleAlert, Copy, createElement, LoaderCircle, MousePointer2, X } from "../../shared/icons";
@@ -23,6 +23,7 @@ export class SelectionController {
   private nextItemId = 0;
   private selectionEnabled = true;
   private showPillTimer: number | null = null;
+  private translationRunId = 0;
 
   public constructor(private readonly documentNode: Document) {}
 
@@ -30,8 +31,8 @@ export class SelectionController {
     this.documentNode.addEventListener("mousedown", this.onMouseDown);
     this.documentNode.addEventListener("mouseup", this.onMouseUp);
     this.documentNode.addEventListener("keyup", this.onKeyUp);
-    this.documentNode.addEventListener("scroll", this.hideOverlays, true);
-    this.documentNode.defaultView?.addEventListener("blur", this.hideOverlays);
+    this.documentNode.addEventListener("scroll", this.hidePill, true);
+    this.documentNode.defaultView?.addEventListener("blur", this.hidePill);
     void this.loadSelectionSettings();
 
     if (typeof chrome !== "undefined" && chrome.storage?.onChanged) {
@@ -62,7 +63,7 @@ export class SelectionController {
     // If the second click arrives after an earlier timer has fired, remove
     // that stale intermediate pill before the final selection is produced.
     if (event.detail >= 2) {
-      this.hideOverlays();
+      this.hidePill();
     }
   };
 
@@ -81,6 +82,10 @@ export class SelectionController {
 
   private onKeyUp = (event: KeyboardEvent): void => {
     if (!this.selectionEnabled) {
+      return;
+    }
+    if (event.key === "Escape") {
+      this.hideOverlays();
       return;
     }
     if (this.isOwnOverlay(event.target as Node | null)) {
@@ -132,11 +137,9 @@ export class SelectionController {
   private showPill(): void {
     const selection = this.readSelection();
     if (!selection) {
-      this.hideOverlays();
+      this.hidePill();
       return;
     }
-    this.result?.remove();
-    this.result = null;
 
     if (!this.pill || !this.pill.isConnected) {
       this.pill = this.buildPill();
@@ -174,7 +177,7 @@ export class SelectionController {
     close.dataset.action = "close";
     close.setAttribute("aria-label", "关闭划词浮层");
     close.append(createElement(X));
-    close.addEventListener("click", () => this.hideOverlays());
+    close.addEventListener("click", () => this.hidePill());
 
     pill.append(translate, copy, close);
     this.documentNode.body.append(pill);
@@ -275,6 +278,7 @@ export class SelectionController {
 
     const anchor = this.currentSelectionRect();
     const result = this.showResultPanel(anchor);
+    const runId = ++this.translationRunId;
     // Once the result panel is up it owns the surface, so drop the pill to avoid
     // two overlays stacked on the selection.
     this.pill?.remove();
@@ -297,8 +301,14 @@ export class SelectionController {
       if (typeof translated !== "string") {
         throw new Error("Missing translation.");
       }
+      if (runId !== this.translationRunId || this.result !== result || !result.isConnected) {
+        return;
+      }
       this.setResultText(result, translated);
     } catch {
+      if (runId !== this.translationRunId || this.result !== result || !result.isConnected) {
+        return;
+      }
       this.setResultState(result, "error", "翻译失败，请重试。");
     }
   }
@@ -335,9 +345,10 @@ export class SelectionController {
     const close = this.documentNode.createElement("button");
     close.className = "xtranslator-selection-action";
     close.type = "button";
-    close.setAttribute("aria-label", "关闭译文面板");
+    close.dataset.action = "close-result";
+    close.setAttribute("aria-label", "取消翻译");
     close.append(createElement(X));
-    close.addEventListener("click", () => this.hideOverlays());
+    close.addEventListener("click", () => this.closeResultPanel());
 
     actions.append(copy, close);
     panel.append(content, actions);
@@ -361,11 +372,15 @@ export class SelectionController {
 
   private setResultState(panel: HTMLElement, state: "loading" | "error" | "done", message: string): void {
     panel.dataset.state = state;
+    const close = panel.querySelector<HTMLButtonElement>('[data-action="close-result"]');
+    close?.setAttribute("aria-label", state === "loading" ? "取消翻译" : "关闭译文面板");
     const content = panel.querySelector<HTMLElement>(".xtranslator-selection-result-text");
     if (content) {
       content.replaceChildren();
       if (state === "loading") {
-        content.append(createElement(LoaderCircle), this.documentNode.createTextNode(message));
+        const loader = createElement(LoaderCircle);
+        loader.classList.add("xtranslator-spin");
+        content.append(loader, this.documentNode.createTextNode(message));
       } else if (state === "error") {
         content.append(createElement(CircleAlert), this.documentNode.createTextNode(message));
       } else {
@@ -376,6 +391,7 @@ export class SelectionController {
 
   private setResultText(panel: HTMLElement, translated: string): void {
     panel.dataset.state = "done";
+    panel.querySelector<HTMLButtonElement>('[data-action="close-result"]')?.setAttribute("aria-label", "关闭译文面板");
     const content = panel.querySelector<HTMLElement>(".xtranslator-selection-result-text");
     if (content) {
       content.replaceChildren();
@@ -404,14 +420,23 @@ export class SelectionController {
     element.style.top = `${Math.round(top)}px`;
   }
 
-  private hideOverlays = (): void => {
+  private hidePill = (): void => {
     if (this.showPillTimer !== null) {
       this.documentNode.defaultView?.clearTimeout(this.showPillTimer);
       this.showPillTimer = null;
     }
     this.pill?.remove();
     this.pill = null;
+  };
+
+  private closeResultPanel = (): void => {
+    this.translationRunId += 1;
     this.result?.remove();
     this.result = null;
+  };
+
+  private hideOverlays = (): void => {
+    this.hidePill();
+    this.closeResultPanel();
   };
 }
