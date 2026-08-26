@@ -17,7 +17,8 @@ import {
 } from "../shared/contracts/settings";
 import { getProviderContextWindow, getProviderPreset } from "../shared/providers/provider-registry";
 import { createCaptionTrackFingerprint, YouTubeTranscriptParser } from "../shared/youtube/transcript-parser";
-import { requestTranscriptBody } from "./transcript-client";
+import { parseYouTubePlayerResponse } from "../shared/youtube/player-response-parser";
+import { requestPlayerResponse, requestTranscriptBody } from "./transcript-client";
 import { CaptionOverlayController } from "./caption-overlay";
 import {
   XTRANSLATOR_DOM,
@@ -26,7 +27,7 @@ import {
   hasExtensionMount,
   isYouTubeNativeCaptionsEnabled,
   readYouTubeVideoSnapshot,
-  removeExtensionMounts,
+  removeVideoExtensionMounts,
   shouldKeepYouTubeTranslationControl,
   shouldShowYouTubeTranslationControl,
   type YouTubePageAnchors,
@@ -45,11 +46,13 @@ const PLAYER_CONTROL_CONFIRMATION_DELAY_MS = 200;
 
 let captionOverlay: CaptionOverlayController | null = null;
 let subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
+let shortsTranslationEnabled = DEFAULT_SUBTITLE_SETTINGS.shortsTranslationEnabled;
+let pageRuntime: YouTubePageRuntime | null = null;
 let nextVideoTranslationRunId = 0;
 let activeVideoTranslationRun: { runId: string; videoId: string; sourceTrackFingerprint: string } | null = null;
 
-function getSubtitleSettings(value: unknown): SubtitleSettings | null {
-  return parseExtensionSettings(value)?.subtitles ?? null;
+function getExtensionSettings(value: unknown) {
+  return parseExtensionSettings(value);
 }
 
 async function saveCaptionVerticalPosition(verticalPosition: number | null): Promise<void> {
@@ -77,10 +80,12 @@ function bindSettingsChange(): void {
       return;
     }
 
-    const settings = getSubtitleSettings(changes.settings?.newValue);
+    const settings = getExtensionSettings(changes.settings?.newValue);
     if (settings) {
-      subtitleSettings = settings;
-      captionOverlay?.setSettings(settings);
+      subtitleSettings = settings.subtitles;
+      shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
+      captionOverlay?.setSettings(settings.subtitles);
+      pageRuntime?.refresh();
     }
   });
 }
@@ -105,11 +110,11 @@ function showTranslationStatus(container: HTMLElement, message: string): void {
 }
 
 function mountTranslationContainers(documentNode: Document, anchors: YouTubePageAnchors): void {
-  if (!hasExtensionMount(documentNode, XTRANSLATOR_DOM.mountTitle)) {
+  if (anchors.title && !hasExtensionMount(documentNode, XTRANSLATOR_DOM.mountTitle)) {
     anchors.title.insertAdjacentElement("afterend", createTranslationContainer(documentNode, XTRANSLATOR_DOM.mountTitle));
   }
 
-  if (!hasExtensionMount(documentNode, XTRANSLATOR_DOM.mountDescription)) {
+  if (anchors.description && !hasExtensionMount(documentNode, XTRANSLATOR_DOM.mountDescription)) {
     anchors.description.insertAdjacentElement(
       "afterend",
       createTranslationContainer(documentNode, XTRANSLATOR_DOM.mountDescription),
@@ -302,13 +307,24 @@ function mountPlayerControl(
   snapshot: YouTubeVideoSnapshot,
   isCurrent: () => boolean,
 ): void {
+  const isShortsPlayer = anchors.player.id === "shorts-player";
+  // Shorts also creates a `.ytp-right-controls` container, but its visible
+  // CC/overflow/fullscreen actions live in the top toolbar instead.
+  const controlParent = isShortsPlayer
+    ? anchors.playerTopControls ?? anchors.player
+    : anchors.playerRightControls ?? anchors.playerTopControls ?? anchors.player;
   const existingMount = findExtensionMount(documentNode, XTRANSLATOR_DOM.mountPlayer);
-  if (existingMount?.parentElement === anchors.playerRightControls) {
+  if (existingMount?.parentElement === controlParent) {
     return;
   }
   existingMount?.remove();
 
-  const control = createMount(documentNode, XTRANSLATOR_DOM.mountPlayer, "xtranslator-player-mount");
+  const isShortsFallback = isShortsPlayer && anchors.playerTopControls === null;
+  const control = createMount(
+    documentNode,
+    XTRANSLATOR_DOM.mountPlayer,
+    isShortsFallback ? "xtranslator-player-mount xtranslator-shorts-player-mount" : "xtranslator-player-mount",
+  );
   const button = documentNode.createElement("button");
   button.className = "xtranslator-control";
   button.type = "button";
@@ -508,7 +524,7 @@ function mountPlayerControl(
     })();
   });
   control.append(button, status);
-  anchors.playerRightControls.prepend(control);
+  controlParent.prepend(control);
   void readCache().then((response) => {
     if (!button.disabled && response.found) {
       void applyCachedResponse(response);
@@ -523,6 +539,8 @@ class YouTubePageRuntime {
   private mountRetryCount = 0;
   private pendingPlayerControlVideoId: string | null = null;
   private playerControlShownVideoId: string | null = null;
+  private bridgeSnapshot: YouTubeVideoSnapshot | null = null;
+  private bridgeSnapshotPending = false;
 
   public start(): void {
     document.addEventListener("yt-navigate-finish", () => {
@@ -532,8 +550,10 @@ class YouTubePageRuntime {
       this.mountRetryCount = 0;
       this.pendingPlayerControlVideoId = null;
       this.playerControlShownVideoId = null;
+      this.bridgeSnapshot = null;
+      this.bridgeSnapshotPending = false;
       deactivateCaptionOverlay();
-      removeExtensionMounts(document);
+      removeVideoExtensionMounts(document);
       void publishVideoTranslationStatus({ phase: "idle" });
       this.scheduleMount();
     });
@@ -562,6 +582,10 @@ class YouTubePageRuntime {
     return true;
   }
 
+  public refresh(): void {
+    this.scheduleMount();
+  }
+
   private mount(): void {
     const anchors = findYouTubePageAnchors(document);
     if (!anchors) {
@@ -570,7 +594,11 @@ class YouTubePageRuntime {
     }
 
     ensureContentStyle(document);
-    const snapshot = readYouTubeVideoSnapshot(document);
+    const documentSnapshot = readYouTubeVideoSnapshot(document);
+    const snapshot = this.bridgeSnapshot ?? documentSnapshot;
+    if (!this.bridgeSnapshot && (!documentSnapshot || documentSnapshot.captionTracks.length === 0)) {
+      this.requestBridgeSnapshot();
+    }
     if (!snapshot) {
       if (this.scheduleMountRetry()) {
         return;
@@ -578,7 +606,7 @@ class YouTubePageRuntime {
       this.pendingPlayerControlVideoId = null;
       this.playerControlShownVideoId = null;
       deactivateCaptionOverlay();
-      removeExtensionMounts(document);
+      removeVideoExtensionMounts(document);
       mountTranslationContainers(document, anchors);
       setTranslationError(document, PAGE_UNSUPPORTED_MESSAGE);
       return;
@@ -589,14 +617,19 @@ class YouTubePageRuntime {
     if (this.activeVideoId !== snapshot.videoId) {
       activeVideoTranslationRun = null;
       deactivateCaptionOverlay();
-      removeExtensionMounts(document);
+      removeVideoExtensionMounts(document);
       this.activeVideoId = snapshot.videoId;
       this.pendingPlayerControlVideoId = null;
       this.playerControlShownVideoId = null;
     }
 
     mountTranslationContainers(document, anchors);
-    const nativeCaptionsEnabled = isYouTubeNativeCaptionsEnabled(document);
+    if (anchors.player.id === "shorts-player" && !shortsTranslationEnabled) {
+      this.pendingPlayerControlVideoId = null;
+      findExtensionMount(document, XTRANSLATOR_DOM.mountPlayer)?.remove();
+      return;
+    }
+    const nativeCaptionsEnabled = isYouTubeNativeCaptionsEnabled(document, anchors.player);
     const canShowPlayerControl = shouldShowYouTubeTranslationControl(snapshot, nativeCaptionsEnabled);
     const alreadyShownForVideo = this.playerControlShownVideoId === snapshot.videoId;
     if (!shouldKeepYouTubeTranslationControl(snapshot, nativeCaptionsEnabled, alreadyShownForVideo)) {
@@ -631,6 +664,21 @@ class YouTubePageRuntime {
       () => navigationVersion === this.navigationVersion && this.activeVideoId === snapshot.videoId,
     );
   }
+
+  private requestBridgeSnapshot(): void {
+    if (this.bridgeSnapshotPending) {
+      return;
+    }
+    this.bridgeSnapshotPending = true;
+    const navigationVersion = this.navigationVersion;
+    void requestPlayerResponse().then((response) => {
+      if (navigationVersion === this.navigationVersion) {
+        this.bridgeSnapshot = parseYouTubePlayerResponse(response);
+      }
+      this.bridgeSnapshotPending = false;
+      this.scheduleMount();
+    });
+  }
 }
 
 // Inject the stylesheet up front so comment controls and the selection overlay are
@@ -640,10 +688,13 @@ bindSettingsChange();
 bindVideoTranslationProgress();
 void createChromeSettingsRepository().loadSettings().then((settings) => {
   subtitleSettings = settings.subtitles;
+  shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
   captionOverlay?.setSettings(subtitleSettings);
+  pageRuntime?.refresh();
 }).catch(() => undefined);
 
-new YouTubePageRuntime().start();
+pageRuntime = new YouTubePageRuntime();
+pageRuntime.start();
 
 const commentController = new CommentTranslationController(document);
 commentController.start();

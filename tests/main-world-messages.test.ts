@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   bridgeTrackFromCaptionTrack,
+  isPlayerResponseReadyMessage,
+  isRequestPlayerResponseMessage,
   isRequestTranscriptMessage,
   isTranscriptErrorMessage,
   isTranscriptReadyMessage,
   type RequestTranscriptMessage,
+  type RequestPlayerResponseMessage,
+  type PlayerResponseReadyMessage,
   type TranscriptErrorMessage,
   type TranscriptReadyMessage,
 } from "../src/shared/youtube/main-world-messages";
@@ -50,6 +54,25 @@ describe("main-world bridge message contract", () => {
       track: { baseUrl: "", vssId: "a.en", languageCode: "en" },
     };
     expect(isRequestTranscriptMessage(message)).toBe(false);
+  });
+
+  it("accepts a player-response request and its bridge reply", () => {
+    const request: RequestPlayerResponseMessage = {
+      source: "xtranslator-content",
+      type: "request-player-response",
+      requestId: "xt-player-1",
+    };
+    expect(isRequestPlayerResponseMessage(request)).toBe(true);
+    expect(isRequestPlayerResponseMessage({ ...request, requestId: "" })).toBe(false);
+
+    const ready: PlayerResponseReadyMessage = {
+      source: "xtranslator-main-world",
+      type: "player-response-ready",
+      requestId: request.requestId,
+      response: { videoDetails: { videoId: "fixture-video-id" } },
+    };
+    expect(isPlayerResponseReadyMessage(ready)).toBe(true);
+    expect(isPlayerResponseReadyMessage({ ...ready, response: undefined })).toBe(true);
   });
 
   it("validates the transcript body that is relayed back", () => {

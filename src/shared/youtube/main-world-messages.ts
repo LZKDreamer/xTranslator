@@ -31,6 +31,12 @@ export interface RequestTranscriptMessage {
   track: BridgeCaptionTrack;
 }
 
+export interface RequestPlayerResponseMessage {
+  source: typeof CONTENT_BRIDGE_SOURCE;
+  type: "request-player-response";
+  requestId: string;
+}
+
 export type TranscriptFailureReason = "no-caption-fetch";
 
 export interface TranscriptReadyMessage {
@@ -47,8 +53,15 @@ export interface TranscriptErrorMessage {
   reason: TranscriptFailureReason;
 }
 
-export type MainWorldBridgeMessage = TranscriptReadyMessage | TranscriptErrorMessage;
-export type ContentBridgeMessage = RequestTranscriptMessage;
+export interface PlayerResponseReadyMessage {
+  source: typeof MAIN_WORLD_BRIDGE_SOURCE;
+  type: "player-response-ready";
+  requestId: string;
+  response: unknown;
+}
+
+export type MainWorldBridgeMessage = TranscriptReadyMessage | TranscriptErrorMessage | PlayerResponseReadyMessage;
+export type ContentBridgeMessage = RequestTranscriptMessage | RequestPlayerResponseMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -81,6 +94,14 @@ export function isRequestTranscriptMessage(value: unknown): value is RequestTran
   );
 }
 
+export function isRequestPlayerResponseMessage(value: unknown): value is RequestPlayerResponseMessage {
+  return isRecord(value) &&
+    value.source === CONTENT_BRIDGE_SOURCE &&
+    value.type === "request-player-response" &&
+    typeof value.requestId === "string" &&
+    value.requestId.length > 0;
+}
+
 export function isTranscriptReadyMessage(value: unknown): value is TranscriptReadyMessage {
   if (!isRecord(value) || value.source !== MAIN_WORLD_BRIDGE_SOURCE || value.type !== "transcript-ready") {
     return false;
@@ -93,6 +114,14 @@ export function isTranscriptErrorMessage(value: unknown): value is TranscriptErr
     return false;
   }
   return typeof value.requestId === "string" && value.reason === "no-caption-fetch";
+}
+
+export function isPlayerResponseReadyMessage(value: unknown): value is PlayerResponseReadyMessage {
+  return isRecord(value) &&
+    value.source === MAIN_WORLD_BRIDGE_SOURCE &&
+    value.type === "player-response-ready" &&
+    typeof value.requestId === "string" &&
+    "response" in value;
 }
 
 export function bridgeTrackFromCaptionTrack(track: YouTubeCaptionTrack): BridgeCaptionTrack {

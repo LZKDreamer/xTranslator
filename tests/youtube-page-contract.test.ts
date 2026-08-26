@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  YOUTUBE_PAGE_SELECTOR,
+  findYouTubePageAnchors,
   isYouTubeNativeCaptionsEnabled,
+  removeVideoExtensionMounts,
   shouldKeepYouTubeTranslationControl,
   shouldShowYouTubeTranslationControl,
 } from "../src/shared/youtube/youtube-page-contract";
@@ -19,6 +22,29 @@ function createSnapshot(captionTracks: YouTubeVideoSnapshot["captionTracks"]): Y
 }
 
 describe("YouTube translation control visibility", () => {
+  it("finds the Shorts player without requiring watch-page metadata", () => {
+    const player = { querySelector: () => null } as unknown as HTMLElement;
+    const documentNode = {
+      querySelector: (selector: string) => {
+        if (selector === YOUTUBE_PAGE_SELECTOR.player) {
+          return player;
+        }
+        return null;
+      },
+    } as unknown as Document;
+
+    expect(YOUTUBE_PAGE_SELECTOR.player).toContain("#shorts-player");
+    expect(YOUTUBE_PAGE_SELECTOR.captionWindow).toBe(".ytp-caption-window-container");
+    expect(YOUTUBE_PAGE_SELECTOR.commentsRoot).toContain("engagement-panel-comments-section");
+    expect(findYouTubePageAnchors(documentNode)).toEqual({
+      player,
+      playerRightControls: null,
+      playerTopControls: null,
+      title: null,
+      description: null,
+    });
+  });
+
   it("shows the control when the native subtitle switch is enabled", () => {
     const button = {
       getAttribute: (name: string) => (name === "aria-pressed" ? "true" : null),
@@ -79,5 +105,23 @@ describe("YouTube translation control visibility", () => {
   it("keeps a shown control during a transient incomplete response for the same video", () => {
     expect(shouldKeepYouTubeTranslationControl(createSnapshot([]), false, true)).toBe(true);
     expect(shouldKeepYouTubeTranslationControl(createSnapshot([]), false, false)).toBe(false);
+  });
+
+  it("cleans up video mounts without removing comment controls", () => {
+    let selector = "";
+    let removed = false;
+    const documentNode = {
+      querySelectorAll: (value: string) => {
+        selector = value;
+        return [{ remove: () => { removed = true; } }];
+      },
+    } as unknown as Document;
+
+    removeVideoExtensionMounts(documentNode);
+
+    expect(removed).toBe(true);
+    expect(selector).toContain('data-xtranslator-mount="player"');
+    expect(selector).toContain('data-xtranslator-mount="caption"');
+    expect(selector).not.toContain("comment");
   });
 });

@@ -2,16 +2,22 @@ import { parseInitialPlayerResponse } from "./player-response-parser";
 import type { YouTubeVideoSnapshot } from "./youtube-types";
 
 export const YOUTUBE_PAGE_SELECTOR = {
-  player: "#movie_player",
-  playerRightControls: "#movie_player .ytp-right-controls",
-  progressBarContainer: "#movie_player .ytp-progress-bar-container",
-  title: "ytd-watch-metadata h1",
-  description: "#description-inline-expander",
+  // Shorts uses a separate player host from the regular watch page, but keeps
+  // the same YouTube player controls and caption APIs inside it.
+  player: "#movie_player, #shorts-player",
+  playerRightControls: ".ytp-right-controls",
+  playerTopControls: ".ytp-chrome-top-buttons",
+  progressBarContainer: ".ytp-progress-bar-container",
+  title: "ytd-watch-metadata h1, ytd-reel-player-header-renderer #title",
+  description: "#description-inline-expander, ytd-reel-player-header-renderer #description",
   subtitleButton: ".ytp-subtitles-button",
-  captionWindow: "#movie_player .ytp-caption-window-container",
+  captionWindow: ".ytp-caption-window-container",
   playerResponseScripts: "script",
   extensionMount: "[data-xtranslator-mount]",
-  commentsRoot: "#comments",
+  // A Short opens comments in an engagement panel. Depending on the current
+  // YouTube rollout, the panel either contains `#comments` or is itself the
+  // stable root while comments are hydrated lazily.
+  commentsRoot: "#comments, ytd-reel-engagement-panel-section-renderer ytd-comments, ytd-reel-engagement-panel-section-renderer[target-id='engagement-panel-comments-section'], ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-comments-section']",
   // The comment element tag changed to `ytd-comment-view-model`; keep the older
   // `ytd-comment-renderer` as a fallback so the adapter tolerates both layouts.
   comment: "ytd-comment-view-model, ytd-comment-renderer",
@@ -44,9 +50,10 @@ export const XTRANSLATOR_DOM = {
 
 export interface YouTubePageAnchors {
   player: HTMLElement;
-  playerRightControls: HTMLElement;
-  title: HTMLElement;
-  description: HTMLElement;
+  playerRightControls: HTMLElement | null;
+  playerTopControls: HTMLElement | null;
+  title: HTMLElement | null;
+  description: HTMLElement | null;
 }
 
 export function readYouTubeVideoSnapshot(documentNode: Document): YouTubeVideoSnapshot | null {
@@ -58,16 +65,17 @@ export function readYouTubeVideoSnapshot(documentNode: Document): YouTubeVideoSn
 
 export function findYouTubePageAnchors(documentNode: Document): YouTubePageAnchors | null {
   const player = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.player);
-  const playerRightControls = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.playerRightControls);
+  const playerRightControls = player?.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.playerRightControls) ?? null;
+  const playerTopControls = player?.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.playerTopControls) ?? null;
   const title = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.title);
   const description = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.description);
-  return player && playerRightControls && title && description
-    ? { player, playerRightControls, title, description }
+  return player
+    ? { player, playerRightControls, playerTopControls, title, description }
     : null;
 }
 
-export function isYouTubeNativeCaptionsEnabled(documentNode: Document): boolean {
-  const button = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
+export function isYouTubeNativeCaptionsEnabled(documentNode: Document, player?: ParentNode): boolean {
+  const button = (player ?? documentNode).querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.subtitleButton);
   if (!button) {
     return false;
   }
@@ -103,6 +111,14 @@ export function hasExtensionMount(documentNode: Document, mount: string): boolea
   return findExtensionMount(documentNode, mount) !== null;
 }
 
-export function removeExtensionMounts(documentNode: Document): void {
-  documentNode.querySelectorAll<HTMLElement>(YOUTUBE_PAGE_SELECTOR.extensionMount).forEach((mount) => mount.remove());
+export function removeVideoExtensionMounts(documentNode: Document): void {
+  const mounts = [
+    XTRANSLATOR_DOM.mountPlayer,
+    XTRANSLATOR_DOM.mountTitle,
+    XTRANSLATOR_DOM.mountDescription,
+    XTRANSLATOR_DOM.mountCaption,
+  ];
+  documentNode
+    .querySelectorAll<HTMLElement>(mounts.map((mount) => `[${XTRANSLATOR_DOM.mountAttribute}="${mount}"]`).join(","))
+    .forEach((mount) => mount.remove());
 }

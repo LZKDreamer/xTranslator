@@ -9,6 +9,7 @@
 import {
   bridgeTrackFromCaptionTrack,
   CONTENT_BRIDGE_SOURCE,
+  isPlayerResponseReadyMessage,
   isTranscriptErrorMessage,
   isTranscriptReadyMessage,
 } from "../shared/youtube/main-world-messages";
@@ -23,6 +24,7 @@ interface PendingRequest {
 }
 
 const pending = new Map<string, PendingRequest>();
+const pendingPlayerResponses = new Map<string, { resolve: (response: unknown) => void; timer: number }>();
 let nextRequestId = 0;
 
 export function requestTranscriptBody(videoId: string, track: YouTubeCaptionTrack): Promise<string> {
@@ -48,8 +50,29 @@ export function requestTranscriptBody(videoId: string, track: YouTubeCaptionTrac
   });
 }
 
+export function requestPlayerResponse(): Promise<unknown> {
+  return new Promise((resolve) => {
+    const requestId = `xt-player-${nextRequestId += 1}`;
+    const timer = window.setTimeout(() => {
+      pendingPlayerResponses.delete(requestId);
+      resolve(null);
+    }, REQUEST_TIMEOUT_MS);
+    pendingPlayerResponses.set(requestId, { resolve, timer });
+    window.postMessage({ source: CONTENT_BRIDGE_SOURCE, type: "request-player-response", requestId }, window.location.origin);
+  });
+}
+
 window.addEventListener("message", (event: MessageEvent<unknown>) => {
   const message = event.data;
+  if (isPlayerResponseReadyMessage(message)) {
+    const entry = pendingPlayerResponses.get(message.requestId);
+    if (entry) {
+      pendingPlayerResponses.delete(message.requestId);
+      window.clearTimeout(entry.timer);
+      entry.resolve(message.response);
+    }
+    return;
+  }
   if (isTranscriptReadyMessage(message)) {
     const entry = pending.get(message.requestId);
     if (entry) {

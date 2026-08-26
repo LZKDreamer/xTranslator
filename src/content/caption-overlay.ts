@@ -27,6 +27,33 @@ interface VerticalRect {
   height: number;
 }
 
+interface OverlayRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface CaptionOverlayGeometry {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Convert viewport coordinates to the player-local space used by the overlay. */
+export function getCaptionOverlayGeometry(playerRect: OverlayRect, targetRect: OverlayRect): CaptionOverlayGeometry | null {
+  if (targetRect.width <= 0 || targetRect.height <= 0) {
+    return null;
+  }
+  return {
+    left: targetRect.left - playerRect.left,
+    top: targetRect.top - playerRect.top,
+    width: targetRect.width,
+    height: targetRect.height,
+  };
+}
+
 /**
  * Returns the space beneath a caption needed to keep it above YouTube's
  * progress bar. A null result lets CSS use the fallback for hidden controls.
@@ -154,6 +181,9 @@ export class CaptionOverlayController {
 
     this.overlay = this.documentNode.createElement("div");
     this.overlay.className = "xtranslator-caption";
+    if (this.player.id === "shorts-player") {
+      this.overlay.dataset.layout = "shorts";
+    }
     this.overlay.setAttribute(XTRANSLATOR_DOM.mountAttribute, XTRANSLATOR_DOM.mountCaption);
     this.overlay.hidden = true;
     // Keep the overlay inside the player so it stays visible in fullscreen, but
@@ -233,13 +263,15 @@ export class CaptionOverlayController {
     }
     const target = this.video ?? this.player;
     const rect = target.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
+    const playerRect = this.player.getBoundingClientRect();
+    const geometry = getCaptionOverlayGeometry(playerRect, rect);
+    if (!geometry) {
       return;
     }
-    this.overlay.style.left = `${rect.left}px`;
-    this.overlay.style.top = `${rect.top}px`;
-    this.overlay.style.width = `${rect.width}px`;
-    this.overlay.style.height = `${rect.height}px`;
+    this.overlay.style.left = `${geometry.left}px`;
+    this.overlay.style.top = `${geometry.top}px`;
+    this.overlay.style.width = `${geometry.width}px`;
+    this.overlay.style.height = `${geometry.height}px`;
 
     const progressBar = this.player.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.progressBarContainer);
     const bottomOffset = progressBar

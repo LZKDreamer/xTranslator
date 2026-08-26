@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCaptionBottomOffset, toTimedBlocks } from "../src/content/caption-overlay";
+import { getCaptionBottomOffset, getCaptionOverlayGeometry, toTimedBlocks } from "../src/content/caption-overlay";
 import type { TranslatedBlock } from "../src/shared/translation/translation-types";
 
 function block(id: string, startMs: number, endMs: number): TranslatedBlock {
@@ -39,5 +39,14 @@ describe("caption progress-bar placement", () => {
       { top: 100, bottom: 500, height: 400 },
       { top: 510, bottom: 520, height: 10 },
     )).toBeNull();
+  });
+});
+
+describe("caption overlay placement", () => {
+  it("uses player-local coordinates instead of viewport coordinates", () => {
+    expect(getCaptionOverlayGeometry(
+      { left: 536, top: 64, width: 463, height: 823 },
+      { left: 536, top: 64, width: 463, height: 823 },
+    )).toEqual({ left: 0, top: 0, width: 463, height: 823 });
   });
 });

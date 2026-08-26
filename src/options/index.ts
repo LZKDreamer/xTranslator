@@ -294,6 +294,7 @@ function buildGeneralSettings(): ExtensionSettings | null {
     return null;
   }
   const displayMode = parseCaptionDisplayMode(queryRequired<HTMLSelectElement>("#caption-mode").value);
+  const shortsTranslationEnabled = queryRequired<HTMLInputElement>("#shorts-translation-enabled").checked;
   const translationColor = queryRequired<HTMLInputElement>("#translation-color").value;
   const originalColor = queryRequired<HTMLInputElement>("#original-color").value;
   const translationFontScale = Number(queryRequired<HTMLInputElement>("#translation-font-scale").value);
@@ -312,6 +313,7 @@ function buildGeneralSettings(): ExtensionSettings | null {
     subtitles: {
       ...base.subtitles,
       displayMode,
+      shortsTranslationEnabled,
       translationColor,
       originalColor,
       translationFontScale,
@@ -448,6 +450,7 @@ async function loadOptions(): Promise<void> {
   });
   queryRequired<HTMLInputElement>("#api-key").value = apiKey;
   queryRequired<HTMLSelectElement>("#caption-mode").value = providerSettings.subtitles.displayMode;
+  queryRequired<HTMLInputElement>("#shorts-translation-enabled").checked = providerSettings.subtitles.shortsTranslationEnabled;
   queryRequired<HTMLInputElement>("#translation-color").value = providerSettings.subtitles.translationColor;
   queryRequired<HTMLInputElement>("#original-color").value = providerSettings.subtitles.originalColor;
   queryRequired<HTMLInputElement>("#translation-font-scale").value = String(providerSettings.subtitles.translationFontScale);
@@ -471,6 +474,7 @@ function bindForm(): void {
   const modelSelect = queryRequired<HTMLSelectElement>("#model");
   const loadModelsButton = queryRequired<HTMLButtonElement>("#load-models");
   const captionModeSelect = queryRequired<HTMLSelectElement>("#caption-mode");
+  const shortsTranslationEnabledInput = queryRequired<HTMLInputElement>("#shorts-translation-enabled");
   const translationColorInput = queryRequired<HTMLInputElement>("#translation-color");
   const originalColorInput = queryRequired<HTMLInputElement>("#original-color");
   const translationFontScaleInput = queryRequired<HTMLInputElement>("#translation-font-scale");
@@ -485,6 +489,7 @@ function bindForm(): void {
     commitTranslationService();
   });
   captionModeSelect.addEventListener("change", saveGeneralSettings);
+  shortsTranslationEnabledInput.addEventListener("change", saveGeneralSettings);
   translationColorInput.addEventListener("input", saveGeneralSettings);
   originalColorInput.addEventListener("input", saveGeneralSettings);
   translationFontScaleInput.addEventListener("input", () => {

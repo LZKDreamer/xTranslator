@@ -13,6 +13,8 @@ export interface ProviderSettings {
 
 export interface SubtitleSettings {
   displayMode: CaptionDisplayMode;
+  /** When true, show the player translation button on YouTube Shorts. */
+  shortsTranslationEnabled: boolean;
   translationColor: string;
   originalColor: string;
   /** Percentage relative to the responsive default type scale. */
@@ -50,6 +52,7 @@ export const DEFAULT_PROVIDER_SETTINGS: Readonly<ProviderSettings> = {
 
 export const DEFAULT_SUBTITLE_SETTINGS: Readonly<SubtitleSettings> = {
   displayMode: DEFAULT_CAPTION_DISPLAY_MODE,
+  shortsTranslationEnabled: false,
   translationColor: "#ffd438",
   originalColor: "#ececf0",
   translationFontScale: 100,
@@ -193,6 +196,13 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
     return null;
   }
 
+  const shortsTranslationEnabled = value.shortsTranslationEnabled === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.shortsTranslationEnabled
+    : value.shortsTranslationEnabled;
+  if (typeof shortsTranslationEnabled !== "boolean") {
+    return null;
+  }
+
   const translationColor = value.translationColor === undefined
     ? DEFAULT_SUBTITLE_SETTINGS.translationColor
     : parseCaptionColor(value.translationColor);
@@ -213,7 +223,15 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
     return null;
   }
 
-  return { displayMode, translationColor, originalColor, translationFontScale, originalFontScale, verticalPosition };
+  return {
+    displayMode,
+    shortsTranslationEnabled,
+    translationColor,
+    originalColor,
+    translationFontScale,
+    originalFontScale,
+    verticalPosition,
+  };
 }
 
 function parseCaptionColor(value: unknown): string | null {

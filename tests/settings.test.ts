@@ -117,6 +117,7 @@ describe("subtitle settings", () => {
   it("defaults to bilingual display", () => {
     expect(DEFAULT_SETTINGS.subtitles).toEqual({
       displayMode: "bilingual",
+      shortsTranslationEnabled: false,
       translationColor: "#ffd438",
       originalColor: "#ececf0",
       translationFontScale: 100,
@@ -135,6 +136,7 @@ describe("subtitle settings", () => {
   it("migrates existing subtitle settings to the default appearance", () => {
     expect(parseSubtitleSettings({ displayMode: "translation" })).toEqual({
       displayMode: "translation",
+      shortsTranslationEnabled: false,
       translationColor: "#ffd438",
       originalColor: "#ececf0",
       translationFontScale: 100,
@@ -146,6 +148,7 @@ describe("subtitle settings", () => {
   it("parses subtitle appearance and a custom vertical position", () => {
     expect(parseSubtitleSettings({
       displayMode: "translation",
+      shortsTranslationEnabled: true,
       translationColor: "#123456",
       originalColor: "#abcdef",
       translationFontScale: 120,
@@ -153,6 +156,7 @@ describe("subtitle settings", () => {
       verticalPosition: 0.25,
     })).toEqual({
       displayMode: "translation",
+      shortsTranslationEnabled: true,
       translationColor: "#123456",
       originalColor: "#abcdef",
       translationFontScale: 120,
@@ -166,6 +170,7 @@ describe("subtitle settings", () => {
     expect(parseSubtitleSettings({ displayMode: "translation", translationColor: "blue" })).toBeNull();
     expect(parseSubtitleSettings({ displayMode: "translation", translationFontScale: 170 })).toBeNull();
     expect(parseSubtitleSettings({ displayMode: "translation", verticalPosition: 2 })).toBeNull();
+    expect(parseSubtitleSettings({ displayMode: "translation", shortsTranslationEnabled: "yes" })).toBeNull();
     expect(parseSubtitleSettings(null)).toBeNull();
   });
 });

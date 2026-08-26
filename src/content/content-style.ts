@@ -3,6 +3,12 @@ import { XTRANSLATOR_DOM, YOUTUBE_PAGE_SELECTOR } from "../shared/youtube/youtub
 
 const CONTENT_STYLE = `
   .xtranslator-player-mount { position: relative; display: flex; flex: 0 0 36px; align-items: center; min-width: 36px; height: 100%; margin-right: 4px; }
+  .xtranslator-shorts-player-mount { position: absolute; top: 24px; right: 152px; z-index: 5; height: 32px; margin: 0; }
+  .xtranslator-shorts-player-mount .xtranslator-status { top: calc(100% + 8px); bottom: auto; }
+  /* Shorts keeps CC/fullscreen controls outside the light-DOM child list, but
+     the visible toolbar is the positioned parent below. Pin our child within
+     that toolbar instead of letting its flex layout push it over fullscreen. */
+  #shorts-player .ytp-chrome-top-buttons > [data-xtranslator-mount="player"] { position: absolute; top: 0; right: 160px; z-index: 1; display: flex; flex: 0 0 44px; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; margin: 0; background: transparent; }
   .xtranslator-control { display: grid; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; box-shadow: none; place-items: center; cursor: pointer; }
   .xtranslator-control svg { display: block; width: 18px; height: 18px; }
   .xtranslator-brand-mark { display: block; object-fit: contain; }
@@ -14,7 +20,7 @@ const CONTENT_STYLE = `
   .xtranslator-status[data-tone="error"] { background: ${DESIGN_TOKEN.color.surfaceGlassDarkStrong}; }
   .xtranslator-spin { animation: xtranslator-rotate 0.8s linear infinite; }
   .xtranslator-translation { margin-top: 8px; color: ${DESIGN_TOKEN.color.textSecondary}; font: 14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  .xtranslator-caption { position: fixed; inset: auto; box-sizing: border-box; z-index: 10000; padding: 0 2%; pointer-events: none; text-align: center; }
+  .xtranslator-caption { position: absolute; inset: auto; box-sizing: border-box; z-index: 10000; padding: 0 2%; pointer-events: none; text-align: center; }
   .xtranslator-caption[hidden] { display: none; }
   .xtranslator-caption-card { position: absolute; bottom: var(--xtranslator-caption-bottom, 4.25rem); left: 50%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; width: fit-content; max-width: min(92%, 72rem); padding: 5px 14px 6px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; background: rgba(0, 0, 0, 0.62); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); pointer-events: auto; touch-action: none; user-select: none; cursor: grab; transform: translateX(-50%); }
   .xtranslator-caption-card[data-position="manual"] { bottom: auto; }
@@ -22,6 +28,10 @@ const CONTENT_STYLE = `
   .xtranslator-caption-line { box-sizing: border-box; display: block; width: 100%; max-width: 100%; padding: 0; color: #ffffff; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size: clamp(15px, 1.35vw, 18px); line-height: 1.25; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); white-space: normal; overflow-wrap: break-word; word-break: normal; text-wrap: pretty; }
   .xtranslator-caption-original { color: var(--xtranslator-caption-original-color, #ececf0); font-size: clamp(calc(13px * var(--xtranslator-caption-original-scale, 1)), calc(1.05vw * var(--xtranslator-caption-original-scale, 1)), calc(15px * var(--xtranslator-caption-original-scale, 1))); }
   .xtranslator-caption-translation { color: var(--xtranslator-caption-translation-color, #ffd438); font-size: clamp(calc(16px * var(--xtranslator-caption-translation-scale, 1)), calc(1.4vw * var(--xtranslator-caption-translation-scale, 1)), calc(19px * var(--xtranslator-caption-translation-scale, 1))); font-weight: 700; }
+  /* Shorts uses a narrow portrait player, so its subtitle size is intentionally
+     fixed and independent from the regular-video preference sliders. */
+  .xtranslator-caption[data-layout="shorts"] .xtranslator-caption-original { font-size: 15px; }
+  .xtranslator-caption[data-layout="shorts"] .xtranslator-caption-translation { font-size: 19px; }
   body.xtranslator-captions-suppressed ${YOUTUBE_PAGE_SELECTOR.captionWindow} { visibility: hidden !important; }
   .${XTRANSLATOR_DOM.nativeCaptionSuppressedClass} { visibility: hidden !important; }
   .xtranslator-comments-control { display: flex; align-items: center; margin: 12px 0 4px; }

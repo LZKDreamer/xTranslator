@@ -22,6 +22,7 @@ describe("SettingsRepository", () => {
       providerModels: {},
       subtitles: {
         displayMode: "bilingual",
+        shortsTranslationEnabled: false,
         translationColor: "#ffd438",
         originalColor: "#ececf0",
         translationFontScale: 100,
@@ -40,6 +41,7 @@ describe("SettingsRepository", () => {
       providerModels: { openai: "gpt-4o-mini" },
       subtitles: {
         displayMode: "translation",
+        shortsTranslationEnabled: false,
         translationColor: "#1a2b3c",
         originalColor: "#d4e5f6",
         translationFontScale: 120,
@@ -54,6 +56,7 @@ describe("SettingsRepository", () => {
       providerModels: { openai: "gpt-4o-mini" },
       subtitles: {
         displayMode: "translation",
+        shortsTranslationEnabled: false,
         translationColor: "#1a2b3c",
         originalColor: "#d4e5f6",
         translationFontScale: 120,

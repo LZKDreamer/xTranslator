@@ -16,6 +16,7 @@
 import { isCaptionRequestUrl, readCaptionVideoId } from "../shared/youtube/caption-request";
 import {
   isRequestTranscriptMessage,
+  isRequestPlayerResponseMessage,
   MAIN_WORLD_BRIDGE_SOURCE,
   type MainWorldBridgeMessage,
   type TranscriptFailureReason,
@@ -319,6 +320,11 @@ function installMessageListener(): void {
       return;
     }
     const message = event.data;
+    if (isRequestPlayerResponseMessage(message)) {
+      const response = (window as unknown as { ytInitialPlayerResponse?: unknown }).ytInitialPlayerResponse ?? null;
+      postToContent({ source: MAIN_WORLD_BRIDGE_SOURCE, type: "player-response-ready", requestId: message.requestId, response });
+      return;
+    }
     if (!isRequestTranscriptMessage(message)) {
       return;
     }
