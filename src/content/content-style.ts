@@ -14,12 +14,14 @@ const CONTENT_STYLE = `
   .xtranslator-status[data-tone="error"] { background: ${DESIGN_TOKEN.color.surfaceGlassDarkStrong}; }
   .xtranslator-spin { animation: xtranslator-rotate 0.8s linear infinite; }
   .xtranslator-translation { margin-top: 8px; color: ${DESIGN_TOKEN.color.textSecondary}; font: 14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  .xtranslator-caption { position: fixed; inset: auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; z-index: 10000; padding: 0 2% 4.25rem; pointer-events: none; text-align: center; }
+  .xtranslator-caption { position: fixed; inset: auto; box-sizing: border-box; z-index: 10000; padding: 0 2%; pointer-events: none; text-align: center; }
   .xtranslator-caption[hidden] { display: none; }
-  .xtranslator-caption-card { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; width: fit-content; max-width: min(92%, 72rem); padding: 5px 14px 6px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; background: rgba(0, 0, 0, 0.62); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); }
-  .xtranslator-caption-line { box-sizing: border-box; display: block; width: 100%; max-width: 100%; padding: 0; color: #ffffff; font: clamp(15px, 1.35vw, 18px)/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); white-space: normal; overflow-wrap: break-word; word-break: normal; text-wrap: pretty; }
-  .xtranslator-caption-original { color: rgba(236, 236, 240, 0.88); font-size: clamp(13px, 1.05vw, 15px); }
-  .xtranslator-caption-translation { color: #ffd438; font-size: clamp(16px, 1.4vw, 19px); font-weight: 700; }
+  .xtranslator-caption-card { position: absolute; bottom: var(--xtranslator-caption-bottom, 4.25rem); left: 50%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; width: fit-content; max-width: min(92%, 72rem); padding: 5px 14px 6px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; background: rgba(0, 0, 0, 0.62); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); pointer-events: auto; touch-action: none; user-select: none; cursor: grab; transform: translateX(-50%); }
+  .xtranslator-caption-card[data-position="manual"] { bottom: auto; }
+  .xtranslator-caption-card[data-dragging="true"] { cursor: grabbing; }
+  .xtranslator-caption-line { box-sizing: border-box; display: block; width: 100%; max-width: 100%; padding: 0; color: #ffffff; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size: clamp(15px, 1.35vw, 18px); line-height: 1.25; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85); white-space: normal; overflow-wrap: break-word; word-break: normal; text-wrap: pretty; }
+  .xtranslator-caption-original { color: var(--xtranslator-caption-original-color, #ececf0); font-size: clamp(calc(13px * var(--xtranslator-caption-original-scale, 1)), calc(1.05vw * var(--xtranslator-caption-original-scale, 1)), calc(15px * var(--xtranslator-caption-original-scale, 1))); }
+  .xtranslator-caption-translation { color: var(--xtranslator-caption-translation-color, #ffd438); font-size: clamp(calc(16px * var(--xtranslator-caption-translation-scale, 1)), calc(1.4vw * var(--xtranslator-caption-translation-scale, 1)), calc(19px * var(--xtranslator-caption-translation-scale, 1))); font-weight: 700; }
   body.xtranslator-captions-suppressed ${YOUTUBE_PAGE_SELECTOR.captionWindow} { visibility: hidden !important; }
   .${XTRANSLATOR_DOM.nativeCaptionSuppressedClass} { visibility: hidden !important; }
   .xtranslator-comments-control { display: flex; align-items: center; margin: 12px 0 4px; }

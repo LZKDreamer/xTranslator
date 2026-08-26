@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SUBTITLE_SETTINGS,
   DEFAULT_SETTINGS,
   normalizeLanguageTag,
   parseApiKeys,
@@ -24,7 +25,7 @@ describe("provider settings", () => {
       provider: { providerId: "deepseek", model: "deepseek-chat" },
       apiKeys: { deepseek: "secret" },
       providerModels: { deepseek: "deepseek-chat" },
-      subtitles: { displayMode: "bilingual" },
+      subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -40,7 +41,7 @@ describe("provider settings", () => {
       provider: { providerId: "deepseek", model: "deepseek-chat" },
       apiKeys: { deepseek: "  secret  " },
       providerModels: { deepseek: "deepseek-chat" },
-      subtitles: { displayMode: "bilingual" },
+      subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -83,7 +84,7 @@ describe("provider settings", () => {
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { deepseek: "deepseek-secret", openai: "openai-secret" },
       providerModels: { deepseek: "deepseek-chat", openai: "gpt-4o-mini" },
-      subtitles: { displayMode: "bilingual" },
+      subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
       selection: { enabled: true, includeContext: false },
     })!;
     expect(resolveProviderApiKey(settings)).toBe("openai-secret");
@@ -114,7 +115,14 @@ describe("provider settings", () => {
 
 describe("subtitle settings", () => {
   it("defaults to bilingual display", () => {
-    expect(DEFAULT_SETTINGS.subtitles.displayMode).toBe("bilingual");
+    expect(DEFAULT_SETTINGS.subtitles).toEqual({
+      displayMode: "bilingual",
+      translationColor: "#ffd438",
+      originalColor: "#ececf0",
+      translationFontScale: 100,
+      originalFontScale: 100,
+      verticalPosition: null,
+    });
   });
 
   it("accepts original, translation and bilingual modes only", () => {
@@ -124,9 +132,40 @@ describe("subtitle settings", () => {
     expect(parseCaptionDisplayMode("x")).toBeNull();
   });
 
-  it("parses a complete subtitle settings object", () => {
-    expect(parseSubtitleSettings({ displayMode: "translation" })).toEqual({ displayMode: "translation" });
+  it("migrates existing subtitle settings to the default appearance", () => {
+    expect(parseSubtitleSettings({ displayMode: "translation" })).toEqual({
+      displayMode: "translation",
+      translationColor: "#ffd438",
+      originalColor: "#ececf0",
+      translationFontScale: 100,
+      originalFontScale: 100,
+      verticalPosition: null,
+    });
+  });
+
+  it("parses subtitle appearance and a custom vertical position", () => {
+    expect(parseSubtitleSettings({
+      displayMode: "translation",
+      translationColor: "#123456",
+      originalColor: "#abcdef",
+      translationFontScale: 120,
+      originalFontScale: 90,
+      verticalPosition: 0.25,
+    })).toEqual({
+      displayMode: "translation",
+      translationColor: "#123456",
+      originalColor: "#abcdef",
+      translationFontScale: 120,
+      originalFontScale: 90,
+      verticalPosition: 0.25,
+    });
+  });
+
+  it("rejects invalid subtitle appearance values", () => {
     expect(parseSubtitleSettings({ displayMode: "nope" })).toBeNull();
+    expect(parseSubtitleSettings({ displayMode: "translation", translationColor: "blue" })).toBeNull();
+    expect(parseSubtitleSettings({ displayMode: "translation", translationFontScale: 170 })).toBeNull();
+    expect(parseSubtitleSettings({ displayMode: "translation", verticalPosition: 2 })).toBeNull();
     expect(parseSubtitleSettings(null)).toBeNull();
   });
 });

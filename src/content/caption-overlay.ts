@@ -10,10 +10,41 @@
 // dropped non-verbal markers, so these are coherent subtitle lines.
 
 import type { TranslatedBlock } from "../shared/translation/translation-types";
-import type { CaptionDisplayMode } from "../shared/contracts/settings";
-import { XTRANSLATOR_DOM } from "../shared/youtube/youtube-page-contract";
+import {
+  DEFAULT_SUBTITLE_SETTINGS,
+  type CaptionDisplayMode,
+  type SubtitleSettings,
+} from "../shared/contracts/settings";
+import { XTRANSLATOR_DOM, YOUTUBE_PAGE_SELECTOR } from "../shared/youtube/youtube-page-contract";
 
 export const CAPTION_SUPPRESSED_CLASS = "xtranslator-captions-suppressed";
+export const CAPTION_PROGRESS_GAP_PX = 8;
+
+interface VerticalRect {
+  top: number;
+  bottom: number;
+  height: number;
+}
+
+/**
+ * Returns the space beneath a caption needed to keep it above YouTube's
+ * progress bar. A null result lets CSS use the fallback for hidden controls.
+ */
+export function getCaptionBottomOffset(
+  playerRect: VerticalRect,
+  progressBarRect: VerticalRect,
+  gapPx = CAPTION_PROGRESS_GAP_PX,
+): number | null {
+  if (
+    playerRect.bottom <= playerRect.top
+    || progressBarRect.height <= 0
+    || progressBarRect.top < playerRect.top
+    || progressBarRect.top > playerRect.bottom
+  ) {
+    return null;
+  }
+  return Math.max(0, playerRect.bottom - progressBarRect.top + gapPx);
+}
 
 export interface TimedBlock {
   id: string;
@@ -65,11 +96,14 @@ export class CaptionOverlayController {
   private video: HTMLVideoElement | null = null;
   private blocks: TimedBlock[] = [];
   private mode: CaptionDisplayMode = "bilingual";
+  private subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
   private nativeCaptionObserver: MutationObserver | null = null;
+  private renderedBlockId: string | null = null;
 
   public constructor(
     private readonly documentNode: Document,
     private readonly player: Element,
+    private readonly onVerticalPositionChange: (position: number | null) => void | Promise<void> = () => undefined,
   ) {}
 
   /** Provide translated blocks and start showing them. */
@@ -90,7 +124,17 @@ export class CaptionOverlayController {
 
   public setMode(mode: CaptionDisplayMode): void {
     this.mode = mode;
+    this.subtitleSettings = { ...this.subtitleSettings, displayMode: mode };
+    this.renderedBlockId = null;
     this.syncOverlay();
+  }
+
+  public setSettings(settings: SubtitleSettings): void {
+    this.subtitleSettings = { ...settings };
+    this.mode = settings.displayMode;
+    this.applySubtitleSettings();
+    this.renderedBlockId = null;
+    this.renderActive();
   }
 
   public isActive(): boolean {
@@ -115,6 +159,7 @@ export class CaptionOverlayController {
     // give it a high z-index so it paints above YouTube's own video layers.
     this.player.append(this.overlay);
 
+    this.applySubtitleSettings();
     this.resolveVideo();
     this.documentNode.body.classList.add(CAPTION_SUPPRESSED_CLASS);
     this.suppressNativeCaptions();
@@ -154,6 +199,7 @@ export class CaptionOverlayController {
     this.overlay?.remove();
     this.overlay = null;
     this.video = null;
+    this.renderedBlockId = null;
   }
 
   private startLoop(): void {
@@ -193,6 +239,24 @@ export class CaptionOverlayController {
     this.overlay.style.top = `${rect.top}px`;
     this.overlay.style.width = `${rect.width}px`;
     this.overlay.style.height = `${rect.height}px`;
+
+    const progressBar = this.player.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.progressBarContainer);
+    const bottomOffset = progressBar
+      ? getCaptionBottomOffset(rect, progressBar.getBoundingClientRect())
+      : null;
+    this.overlay.style.setProperty("--xtranslator-caption-bottom", bottomOffset === null ? "" : `${bottomOffset}px`);
+    this.positionCard();
+  }
+
+  private applySubtitleSettings(): void {
+    if (this.overlay === null) {
+      return;
+    }
+    this.overlay.style.setProperty("--xtranslator-caption-translation-color", this.subtitleSettings.translationColor);
+    this.overlay.style.setProperty("--xtranslator-caption-original-color", this.subtitleSettings.originalColor);
+    this.overlay.style.setProperty("--xtranslator-caption-translation-scale", String(this.subtitleSettings.translationFontScale / 100));
+    this.overlay.style.setProperty("--xtranslator-caption-original-scale", String(this.subtitleSettings.originalFontScale / 100));
+    this.positionCard();
   }
 
   private currentTimeMs(): number {
@@ -231,6 +295,7 @@ export class CaptionOverlayController {
     if (!block) {
       this.overlay.hidden = true;
       this.overlay.replaceChildren();
+      this.renderedBlockId = null;
       return;
     }
 
@@ -256,20 +321,85 @@ export class CaptionOverlayController {
     if (lines.length === 0) {
       this.overlay.hidden = true;
       this.overlay.replaceChildren();
+      this.renderedBlockId = null;
+      return;
+    }
+
+    if (this.renderedBlockId === block.id && this.overlay.firstElementChild) {
       return;
     }
 
     this.overlay.hidden = false;
     this.overlay.replaceChildren();
     this.appendCard(lines, block.id);
+    this.renderedBlockId = block.id;
   }
 
   private appendCard(lines: readonly CaptionLine[], blockId: string): void {
     const card = this.documentNode.createElement("div");
     card.className = "xtranslator-caption-card";
     card.dataset.xtranslatorBlockId = blockId;
+    card.setAttribute("aria-label", "上下拖动可调整字幕位置");
     lines.forEach((line) => this.appendLine(card, line.text, line.className, blockId));
     this.overlay?.append(card);
+    this.positionCard(card);
+    this.bindCardDrag(card);
+  }
+
+  private positionCard(card = this.overlay?.querySelector<HTMLElement>(".xtranslator-caption-card") ?? null): void {
+    if (this.overlay === null || card === null) {
+      return;
+    }
+    const position = this.subtitleSettings.verticalPosition;
+    if (position === null) {
+      delete card.dataset.position;
+      card.style.top = "";
+      return;
+    }
+    const availableHeight = Math.max(0, this.overlay.clientHeight - card.offsetHeight);
+    card.dataset.position = "manual";
+    card.style.top = `${Math.round(position * availableHeight)}px`;
+  }
+
+  private bindCardDrag(card: HTMLDivElement): void {
+    card.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || this.overlay === null) {
+        return;
+      }
+      event.preventDefault();
+      const overlayRect = this.overlay.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const availableHeight = Math.max(0, overlayRect.height - cardRect.height);
+      const startTop = Math.max(0, Math.min(availableHeight, cardRect.top - overlayRect.top));
+      const startY = event.clientY;
+      card.setPointerCapture(event.pointerId);
+      card.dataset.dragging = "true";
+
+      const move = (moveEvent: PointerEvent): void => {
+        if (moveEvent.pointerId !== event.pointerId) {
+          return;
+        }
+        const nextTop = Math.max(0, Math.min(availableHeight, startTop + moveEvent.clientY - startY));
+        this.subtitleSettings = {
+          ...this.subtitleSettings,
+          verticalPosition: availableHeight === 0 ? 0 : nextTop / availableHeight,
+        };
+        this.positionCard(card);
+      };
+      const end = (endEvent: PointerEvent): void => {
+        if (endEvent.pointerId !== event.pointerId) {
+          return;
+        }
+        card.removeEventListener("pointermove", move);
+        card.removeEventListener("pointerup", end);
+        card.removeEventListener("pointercancel", end);
+        delete card.dataset.dragging;
+        void this.onVerticalPositionChange(this.subtitleSettings.verticalPosition);
+      };
+      card.addEventListener("pointermove", move);
+      card.addEventListener("pointerup", end);
+      card.addEventListener("pointercancel", end);
+    });
   }
 
   private appendLine(parent: HTMLElement, text: string, className: string, blockId: string): void {

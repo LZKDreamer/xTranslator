@@ -10,7 +10,11 @@ import {
   type VideoTranslationCacheResponse,
   type VideoTranslationStatus,
 } from "../shared/contracts/messages";
-import { parseCaptionDisplayMode, type CaptionDisplayMode } from "../shared/contracts/settings";
+import {
+  DEFAULT_SUBTITLE_SETTINGS,
+  parseExtensionSettings,
+  type SubtitleSettings,
+} from "../shared/contracts/settings";
 import { getProviderContextWindow, getProviderPreset } from "../shared/providers/provider-registry";
 import { createCaptionTrackFingerprint, YouTubeTranscriptParser } from "../shared/youtube/transcript-parser";
 import { requestTranscriptBody } from "./transcript-client";
@@ -33,25 +37,33 @@ import type { TranslationSourceSegment } from "../shared/translation/translation
 import { CommentTranslationController } from "./comments/comment-controller";
 import { SelectionController } from "./selection/selection-controller";
 import { ensureContentStyle } from "./content-style";
+import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
 
 const PAGE_UNSUPPORTED_MESSAGE = "当前 YouTube 页面暂不支持读取。";
 const PLAYER_CONTROL_CONFIRMATION_DELAY_MS = 200;
 
 let captionOverlay: CaptionOverlayController | null = null;
+let subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
 let nextVideoTranslationRunId = 0;
 let activeVideoTranslationRun: { runId: string; videoId: string; sourceTrackFingerprint: string } | null = null;
 
-function readDisplayMode(value: unknown): CaptionDisplayMode | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
+function getSubtitleSettings(value: unknown): SubtitleSettings | null {
+  return parseExtensionSettings(value)?.subtitles ?? null;
+}
 
-  const subtitles = (value as { subtitles?: unknown }).subtitles;
-  if (typeof subtitles !== "object" || subtitles === null) {
-    return null;
-  }
+async function saveCaptionVerticalPosition(verticalPosition: number | null): Promise<void> {
+  const repository = createChromeSettingsRepository();
+  const settings = await repository.loadSettings();
+  await repository.saveSettings({
+    ...settings,
+    subtitles: { ...settings.subtitles, verticalPosition },
+  });
+}
 
-  return parseCaptionDisplayMode((subtitles as { displayMode?: unknown }).displayMode);
+function getCaptionOverlay(documentNode: Document, player: Element): CaptionOverlayController {
+  captionOverlay ??= new CaptionOverlayController(documentNode, player, saveCaptionVerticalPosition);
+  captionOverlay.setSettings(subtitleSettings);
+  return captionOverlay;
 }
 
 function bindSettingsChange(): void {
@@ -64,9 +76,10 @@ function bindSettingsChange(): void {
       return;
     }
 
-    const mode = readDisplayMode(changes.settings?.newValue);
-    if (mode && captionOverlay?.isActive()) {
-      captionOverlay.setMode(mode);
+    const settings = getSubtitleSettings(changes.settings?.newValue);
+    if (settings) {
+      subtitleSettings = settings;
+      captionOverlay?.setSettings(settings);
     }
   });
 }
@@ -192,9 +205,9 @@ function bindVideoTranslationProgress(): void {
     if (!anchors) {
       return false;
     }
-    captionOverlay ??= new CaptionOverlayController(document, anchors.player);
-    captionOverlay.append([message.block]);
-    captionOverlay.setMode(message.displayMode);
+    const overlay = getCaptionOverlay(document, anchors.player);
+    overlay.append([message.block]);
+    overlay.setMode(message.displayMode);
     return false;
   });
 }
@@ -325,9 +338,9 @@ function mountPlayerControl(
     )) {
       return false;
     }
-    captionOverlay ??= new CaptionOverlayController(documentNode, anchors.player);
-    captionOverlay.load(response.blocks);
-    captionOverlay.setMode(response.displayMode);
+    const overlay = getCaptionOverlay(documentNode, anchors.player);
+    overlay.load(response.blocks);
+    overlay.setMode(response.displayMode);
     const translatedCount = response.blocks.filter((block) => block.translatedText.trim()).length;
     renderStatus(documentNode, status, "success", Check, false, `已加载缓存：${response.blocks.length} 段`);
     setPlayerButtonLabel(button, "再次翻译");
@@ -425,9 +438,9 @@ function mountPlayerControl(
                 translatedCount: 0,
               });
             } else {
-              captionOverlay ??= new CaptionOverlayController(documentNode, anchors.player);
-              captionOverlay.load(response.blocks);
-              captionOverlay.setMode(response.displayMode);
+              const overlay = getCaptionOverlay(documentNode, anchors.player);
+              overlay.load(response.blocks);
+              overlay.setMode(response.displayMode);
 
               const translatedCount = response.blocks.length - response.missingIds.length;
               renderStatus(documentNode, status, "success", Check, false, `翻译完成：${response.blocks.length} 段`);
@@ -442,9 +455,9 @@ function mountPlayerControl(
             }
           } else {
             if (response.partial) {
-              captionOverlay ??= new CaptionOverlayController(documentNode, anchors.player);
-              captionOverlay.load(response.partial.blocks);
-              captionOverlay.setMode(response.partial.displayMode);
+              const overlay = getCaptionOverlay(documentNode, anchors.player);
+              overlay.load(response.partial.blocks);
+              overlay.setMode(response.partial.displayMode);
               setPlayerButtonLabel(button, "继续翻译");
               renderStatus(
                 documentNode,
@@ -627,6 +640,10 @@ class YouTubePageRuntime {
 ensureContentStyle(document);
 bindSettingsChange();
 bindVideoTranslationProgress();
+void createChromeSettingsRepository().loadSettings().then((settings) => {
+  subtitleSettings = settings.subtitles;
+  captionOverlay?.setSettings(subtitleSettings);
+}).catch(() => undefined);
 
 new YouTubePageRuntime().start();
 

@@ -4,6 +4,7 @@ import {
 } from "../shared/contracts/messages";
 import {
   DEFAULT_PROVIDER_ID,
+  DEFAULT_SUBTITLE_SETTINGS,
   parseCaptionDisplayMode,
   resolveProviderApiKey,
   resolveProviderModel,
@@ -287,12 +288,29 @@ function buildGeneralSettings(): ExtensionSettings | null {
     return null;
   }
   const displayMode = parseCaptionDisplayMode(queryRequired<HTMLSelectElement>("#caption-mode").value);
-  if (!displayMode) {
+  const translationColor = queryRequired<HTMLInputElement>("#translation-color").value;
+  const originalColor = queryRequired<HTMLInputElement>("#original-color").value;
+  const translationFontScale = Number(queryRequired<HTMLInputElement>("#translation-font-scale").value);
+  const originalFontScale = Number(queryRequired<HTMLInputElement>("#original-font-scale").value);
+  if (
+    !displayMode
+    || !/^#[0-9a-f]{6}$/iu.test(translationColor)
+    || !/^#[0-9a-f]{6}$/iu.test(originalColor)
+    || !Number.isInteger(translationFontScale) || translationFontScale < 80 || translationFontScale > 160
+    || !Number.isInteger(originalFontScale) || originalFontScale < 80 || originalFontScale > 160
+  ) {
     return null;
   }
   return {
     ...base,
-    subtitles: { displayMode },
+    subtitles: {
+      ...base.subtitles,
+      displayMode,
+      translationColor,
+      originalColor,
+      translationFontScale,
+      originalFontScale,
+    },
     selection: {
       enabled: queryRequired<HTMLInputElement>("#selection-enabled").checked,
       includeContext: queryRequired<HTMLInputElement>("#include-context").checked,
@@ -424,6 +442,11 @@ async function loadOptions(): Promise<void> {
   });
   queryRequired<HTMLInputElement>("#api-key").value = apiKey;
   queryRequired<HTMLSelectElement>("#caption-mode").value = providerSettings.subtitles.displayMode;
+  queryRequired<HTMLInputElement>("#translation-color").value = providerSettings.subtitles.translationColor;
+  queryRequired<HTMLInputElement>("#original-color").value = providerSettings.subtitles.originalColor;
+  queryRequired<HTMLInputElement>("#translation-font-scale").value = String(providerSettings.subtitles.translationFontScale);
+  queryRequired<HTMLInputElement>("#original-font-scale").value = String(providerSettings.subtitles.originalFontScale);
+  updateSubtitleFontScaleLabels();
   queryRequired<HTMLInputElement>("#selection-enabled").checked = providerSettings.selection.enabled;
   queryRequired<HTMLInputElement>("#include-context").checked = providerSettings.selection.includeContext;
   populateProviders(providerSettings.provider.providerId);
@@ -442,6 +465,10 @@ function bindForm(): void {
   const modelSelect = queryRequired<HTMLSelectElement>("#model");
   const loadModelsButton = queryRequired<HTMLButtonElement>("#load-models");
   const captionModeSelect = queryRequired<HTMLSelectElement>("#caption-mode");
+  const translationColorInput = queryRequired<HTMLInputElement>("#translation-color");
+  const originalColorInput = queryRequired<HTMLInputElement>("#original-color");
+  const translationFontScaleInput = queryRequired<HTMLInputElement>("#translation-font-scale");
+  const originalFontScaleInput = queryRequired<HTMLInputElement>("#original-font-scale");
   const selectionEnabledInput = queryRequired<HTMLInputElement>("#selection-enabled");
   const includeContextInput = queryRequired<HTMLInputElement>("#include-context");
 
@@ -452,6 +479,16 @@ function bindForm(): void {
     commitTranslationService();
   });
   captionModeSelect.addEventListener("change", saveGeneralSettings);
+  translationColorInput.addEventListener("input", saveGeneralSettings);
+  originalColorInput.addEventListener("input", saveGeneralSettings);
+  translationFontScaleInput.addEventListener("input", () => {
+    updateSubtitleFontScaleLabels();
+    saveGeneralSettings();
+  });
+  originalFontScaleInput.addEventListener("input", () => {
+    updateSubtitleFontScaleLabels();
+    saveGeneralSettings();
+  });
   selectionEnabledInput.addEventListener("change", saveGeneralSettings);
   includeContextInput.addEventListener("change", saveGeneralSettings);
   apiKeyInput.addEventListener("input", () => {
@@ -509,6 +546,25 @@ function bindForm(): void {
       .then(() => loadCacheList())
       .catch(() => showToast("清空翻译记录失败，请稍后再试。", "error"));
   });
+  queryRequired<HTMLButtonElement>("#reset-subtitle-style").addEventListener("click", () => {
+    translationColorInput.value = DEFAULT_SUBTITLE_SETTINGS.translationColor;
+    originalColorInput.value = DEFAULT_SUBTITLE_SETTINGS.originalColor;
+    translationFontScaleInput.value = String(DEFAULT_SUBTITLE_SETTINGS.translationFontScale);
+    originalFontScaleInput.value = String(DEFAULT_SUBTITLE_SETTINGS.originalFontScale);
+    updateSubtitleFontScaleLabels();
+    const base = pendingSettings ?? inFlightSettings ?? committedSettings;
+    const displayMode = parseCaptionDisplayMode(captionModeSelect.value);
+    if (base && displayMode) {
+      scheduleSettingsSave({
+        ...base,
+        subtitles: {
+          ...DEFAULT_SUBTITLE_SETTINGS,
+          displayMode,
+        },
+      });
+      showToast("已恢复字幕默认样式与自动位置。", "success");
+    }
+  });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -518,6 +574,13 @@ function bindForm(): void {
     }
     commitTranslationService();
   });
+}
+
+function updateSubtitleFontScaleLabels(): void {
+  const translationScale = queryRequired<HTMLInputElement>("#translation-font-scale").value;
+  const originalScale = queryRequired<HTMLInputElement>("#original-font-scale").value;
+  queryRequired<HTMLOutputElement>("#translation-font-scale-value").value = `${translationScale}%`;
+  queryRequired<HTMLOutputElement>("#original-font-scale-value").value = `${originalScale}%`;
 }
 
 async function initialize(): Promise<void> {

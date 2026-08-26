@@ -4,6 +4,7 @@ import type { YouTubeVideoSnapshot } from "./youtube-types";
 export const YOUTUBE_PAGE_SELECTOR = {
   player: "#movie_player",
   playerRightControls: "#movie_player .ytp-right-controls",
+  progressBarContainer: "#movie_player .ytp-progress-bar-container",
   title: "ytd-watch-metadata h1",
   description: "#description-inline-expander",
   subtitleButton: ".ytp-subtitles-button",

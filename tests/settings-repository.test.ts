@@ -20,7 +20,14 @@ describe("SettingsRepository", () => {
       provider: { providerId: "deepseek", model: "" },
       apiKeys: {},
       providerModels: {},
-      subtitles: { displayMode: "bilingual" },
+      subtitles: {
+        displayMode: "bilingual",
+        translationColor: "#ffd438",
+        originalColor: "#ececf0",
+        translationFontScale: 100,
+        originalFontScale: 100,
+        verticalPosition: null,
+      },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -31,14 +38,28 @@ describe("SettingsRepository", () => {
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { openai: "secret" },
       providerModels: { openai: "gpt-4o-mini" },
-      subtitles: { displayMode: "translation" },
+      subtitles: {
+        displayMode: "translation",
+        translationColor: "#1a2b3c",
+        originalColor: "#d4e5f6",
+        translationFontScale: 120,
+        originalFontScale: 90,
+        verticalPosition: 0.25,
+      },
       selection: { enabled: false, includeContext: true },
     });
     await expect(repository.loadSettings()).resolves.toEqual({
       provider: { providerId: "openai", model: "gpt-4o-mini" },
       apiKeys: { openai: "secret" },
       providerModels: { openai: "gpt-4o-mini" },
-      subtitles: { displayMode: "translation" },
+      subtitles: {
+        displayMode: "translation",
+        translationColor: "#1a2b3c",
+        originalColor: "#d4e5f6",
+        translationFontScale: 120,
+        originalFontScale: 90,
+        verticalPosition: 0.25,
+      },
       selection: { enabled: false, includeContext: true },
     });
   });

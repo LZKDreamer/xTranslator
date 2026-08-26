@@ -106,7 +106,7 @@ interface TranscriptSegment {
 | 右侧控制组 | `#movie_player .ytp-right-controls` | 翻译按钮插入该容器的首位，并使用自身 data 属性防止重复。 |
 | 原字幕按钮 | `.ytp-subtitles-button` | 先排除 `aria-disabled="true"`、`disabled` 属性和 `ytp-button-disabled` class；仅对可用按钮使用 `aria-pressed="true"` 或 `ytp-button-pressed` class 判断是否实际开启；不读取 aria 文案。全局字幕偏好不作为当前视频有无字幕的依据。仅在不改变播放器字幕状态的前提下触发字幕加载时点击。 |
 | 字幕层容器 | `#movie_player .ytp-caption-window-container` | 捕获字幕那一瞬用注入样式临时隐藏以防原生字幕闪现，捕获后恢复；当观看页字幕叠加层激活时，再由 `body.xtranslator-captions-suppressed` 隐藏以“取代”原字幕。 |
-| 扩展字幕叠加层 | `#movie_player [data-xtranslator-mount="caption"]` | 由内容脚本追加到 `#movie_player` 内；运行时按实际 `<video>` 的 viewport 矩形同步 fixed 层几何位置，高 z-index；双语为译文在上（黄色）、原文在下，共享一个紧凑字幕卡片。单行优先，过长在约 92% 视频宽度内换行，卡片背景约 62% 透明。 |
+| 扩展字幕叠加层 | `#movie_player [data-xtranslator-mount="caption"]` | 由内容脚本追加到 `#movie_player` 内；运行时按实际 `<video>` 的 viewport 矩形同步 fixed 层几何位置，高 z-index；默认读取 `.ytp-progress-bar-container` 的实际边界，使字幕卡片底边位于进度条上方 8px。双语为译文在上（默认黄色）、原文在下，共享一个紧凑字幕卡片；用户可在播放器内上下拖动卡片，位置按播放器高度比例保存。单行优先，过长在约 92% 视频宽度内换行，卡片背景约 62% 透明。 |
 | 设置按钮 | `.ytp-settings-button` | 不覆盖其事件或样式。 |
 | 标题 | `ytd-watch-metadata h1` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文。 |
 | 简介 | `#description-inline-expander` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文；不能改写原简介。 |

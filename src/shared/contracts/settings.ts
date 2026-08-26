@@ -13,6 +13,14 @@ export interface ProviderSettings {
 
 export interface SubtitleSettings {
   displayMode: CaptionDisplayMode;
+  translationColor: string;
+  originalColor: string;
+  /** Percentage relative to the responsive default type scale. */
+  translationFontScale: number;
+  /** Percentage relative to the responsive default type scale. */
+  originalFontScale: number;
+  /** Vertical position in the player, from 0 (top) to 1 (bottom). Null uses automatic placement. */
+  verticalPosition: number | null;
 }
 
 export interface SelectionSettings {
@@ -42,6 +50,11 @@ export const DEFAULT_PROVIDER_SETTINGS: Readonly<ProviderSettings> = {
 
 export const DEFAULT_SUBTITLE_SETTINGS: Readonly<SubtitleSettings> = {
   displayMode: DEFAULT_CAPTION_DISPLAY_MODE,
+  translationColor: "#ffd438",
+  originalColor: "#ececf0",
+  translationFontScale: 100,
+  originalFontScale: 100,
+  verticalPosition: null,
 };
 
 export const DEFAULT_SELECTION_SETTINGS: Readonly<SelectionSettings> = {
@@ -176,7 +189,46 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
   }
 
   const displayMode = parseCaptionDisplayMode(value.displayMode);
-  return displayMode ? { displayMode } : null;
+  if (!displayMode) {
+    return null;
+  }
+
+  const translationColor = value.translationColor === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.translationColor
+    : parseCaptionColor(value.translationColor);
+  const originalColor = value.originalColor === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.originalColor
+    : parseCaptionColor(value.originalColor);
+  const translationFontScale = value.translationFontScale === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.translationFontScale
+    : parseCaptionFontScale(value.translationFontScale);
+  const originalFontScale = value.originalFontScale === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.originalFontScale
+    : parseCaptionFontScale(value.originalFontScale);
+  if (!translationColor || !originalColor || !translationFontScale || !originalFontScale) {
+    return null;
+  }
+  const verticalPosition = parseVerticalCaptionPosition(value.verticalPosition);
+  if (verticalPosition === undefined) {
+    return null;
+  }
+
+  return { displayMode, translationColor, originalColor, translationFontScale, originalFontScale, verticalPosition };
+}
+
+function parseCaptionColor(value: unknown): string | null {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/iu.test(value) ? value.toLowerCase() : null;
+}
+
+function parseCaptionFontScale(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 80 && value <= 160 ? value : null;
+}
+
+function parseVerticalCaptionPosition(value: unknown): number | null | undefined {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value : undefined;
 }
 
 export function parseSelectionSettings(value: unknown): SelectionSettings | null {

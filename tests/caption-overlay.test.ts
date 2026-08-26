@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toTimedBlocks } from "../src/content/caption-overlay";
+import { getCaptionBottomOffset, toTimedBlocks } from "../src/content/caption-overlay";
 import type { TranslatedBlock } from "../src/shared/translation/translation-types";
 
 function block(id: string, startMs: number, endMs: number): TranslatedBlock {
@@ -19,5 +19,25 @@ describe("caption timeline normalization", () => {
       expect.objectContaining({ id: "first", startMs: 0, endMs: 2500 }),
       expect.objectContaining({ id: "next", startMs: 2500, endMs: 3500 }),
     ]);
+  });
+});
+
+describe("caption progress-bar placement", () => {
+  it("places the subtitle above the progress bar with a small gap", () => {
+    expect(getCaptionBottomOffset(
+      { top: 100, bottom: 500, height: 400 },
+      { top: 460, bottom: 470, height: 10 },
+    )).toBe(48);
+  });
+
+  it("uses the CSS fallback when the progress bar is hidden or outside the player", () => {
+    expect(getCaptionBottomOffset(
+      { top: 100, bottom: 500, height: 400 },
+      { top: 460, bottom: 460, height: 0 },
+    )).toBeNull();
+    expect(getCaptionBottomOffset(
+      { top: 100, bottom: 500, height: 400 },
+      { top: 510, bottom: 520, height: 10 },
+    )).toBeNull();
   });
 });
