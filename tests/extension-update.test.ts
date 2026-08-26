@@ -1,7 +1,11 @@
-import { compareExtensionVersions, getAvailableUpdate } from "../src/shared/extension-update";
+import { compareExtensionVersions, getAvailableUpdate, UPDATE_MANIFEST_URL } from "../src/shared/extension-update";
 import { describe, expect, it } from "vitest";
 
 describe("extension update", () => {
+  it("loads the mutable update manifest through jsDelivr", () => {
+    expect(UPDATE_MANIFEST_URL).toBe("https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@main/public/updates/latest.json");
+  });
+
   it("compares Chrome extension versions", () => {
     expect(compareExtensionVersions("1.0.1", "1.0.0")).toBeGreaterThan(0);
     expect(compareExtensionVersions("1.0", "1.0.0")).toBe(0);
