@@ -26,6 +26,8 @@ import {
 } from "../shared/storage/video-translation-cache";
 import { VideoTranslationService, type BlockProgressWriter } from "./translation-service";
 
+const COMMENT_BATCH_CONCURRENCY = 3;
+
 async function getSettingsResponse(): Promise<SettingsMessageResponse> {
   const settings = await createChromeSettingsRepository().loadSettings();
   const resolvedTargetLocale = resolveTargetLocale(AUTO_TARGET_LANGUAGE, createBrowserLocaleEnvironment());
@@ -188,7 +190,9 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
     adapter,
     apiKey,
     model,
-    singleItemBatches: message.scope === "comment",
+    ...(message.scope === "comment" && message.videoTitle ? { videoTitle: message.videoTitle } : {}),
+    retryMissingItems: message.scope === "comment",
+    maxConcurrentBatches: message.scope === "comment" ? COMMENT_BATCH_CONCURRENCY : 1,
   });
 
   if (!run.ok) {

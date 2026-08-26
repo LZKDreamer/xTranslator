@@ -175,6 +175,7 @@ describe("extension messages", () => {
     const valid = {
       type: MESSAGE_TYPE.translateText,
       scope: "comment",
+      videoTitle: "Demo video",
       items: [
         { id: "c1", sourceText: "hello" },
         { id: "c2", sourceText: "world", contextBefore: "x", contextAfter: "y" },

@@ -33,4 +33,13 @@ describe("batchTextItems", () => {
     const batches = batchTextItems([light, heavy], 700);
     expect(batches).toEqual([[light], [heavy]]);
   });
+
+  it("reserves request context and output capacity", () => {
+    const items = [
+      { id: "a", sourceText: "x".repeat(1200) },
+      { id: "b", sourceText: "y".repeat(1200) },
+    ];
+    const batches = batchTextItems(items, 64_000, { inputContextTokens: 100, maxOutputTokens: 512 });
+    expect(batches).toEqual([[items[0]], [items[1]]]);
+  });
 });

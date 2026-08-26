@@ -21,3 +21,30 @@ export function computeInputTokenBudget(contextWindowTokens: number): number {
 export function estimatedTokensForSourceText(text: string, perItemOverhead: number): number {
   return estimateTokens(text) + perItemOverhead;
 }
+
+/** Groups whole items into ordered batches without exceeding the supplied budget. */
+export function batchItemsByTokenBudget<T>(
+  items: readonly T[],
+  budget: number,
+  estimateItemTokens: (item: T) => number,
+): T[][] {
+  const batches: T[][] = [];
+  let current: T[] = [];
+  let currentTokens = 0;
+
+  for (const item of items) {
+    const tokens = estimateItemTokens(item);
+    if (current.length > 0 && currentTokens + tokens > budget) {
+      batches.push(current);
+      current = [];
+      currentTokens = 0;
+    }
+    current.push(item);
+    currentTokens += tokens;
+  }
+
+  if (current.length > 0) {
+    batches.push(current);
+  }
+  return batches;
+}

@@ -107,6 +107,8 @@ export interface TranslateTextMessage {
   type: typeof MESSAGE_TYPE.translateText;
   scope: TextTranslationScope;
   items: TextTranslationItem[];
+  /** Read-only page context used only for comment translation. */
+  videoTitle?: string;
 }
 
 export type TranslateTextResponse =
@@ -426,7 +428,12 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
         }
         items.push(parsed);
       }
-      return { type: MESSAGE_TYPE.translateText, scope: value.scope, items };
+      return {
+        type: MESSAGE_TYPE.translateText,
+        scope: value.scope,
+        items,
+        ...(typeof value.videoTitle === "string" ? { videoTitle: value.videoTitle } : {}),
+      };
     }
     default:
       return null;

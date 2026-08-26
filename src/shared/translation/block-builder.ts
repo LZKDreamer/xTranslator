@@ -22,6 +22,7 @@
 
 import {
   computeInputTokenBudget,
+  batchItemsByTokenBudget,
   PER_BLOCK_OVERHEAD_TOKENS,
 } from "./chunker";
 import { estimateTokens } from "./token-estimator";
@@ -281,23 +282,5 @@ export function batchTranslationBlocks(
   contextWindowTokens: number,
 ): TranslationBlockInput[][] {
   const budget = computeInputTokenBudget(contextWindowTokens);
-  const batches: TranslationBlockInput[][] = [];
-  let current: TranslationBlockInput[] = [];
-  let currentTokens = 0;
-
-  for (const block of blocks) {
-    const tokens = estimateTokens(block.sourceText) + PER_BLOCK_OVERHEAD_TOKENS;
-    if (current.length > 0 && currentTokens + tokens > budget) {
-      batches.push(current);
-      current = [];
-      currentTokens = 0;
-    }
-    current.push(block);
-    currentTokens += tokens;
-  }
-
-  if (current.length > 0) {
-    batches.push(current);
-  }
-  return batches;
+  return batchItemsByTokenBudget(blocks, budget, (block) => estimateTokens(block.sourceText) + PER_BLOCK_OVERHEAD_TOKENS);
 }

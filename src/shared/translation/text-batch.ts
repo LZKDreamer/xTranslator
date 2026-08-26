@@ -4,41 +4,33 @@
 // (each batch stays inside the provider context window) and preserve input order.
 // Items are never split — an item either fits in a batch or starts a new one.
 
-import { computeInputTokenBudget, estimatedTokensForSourceText, PER_BLOCK_OVERHEAD_TOKENS } from "./chunker";
+import { batchItemsByTokenBudget, computeInputTokenBudget, estimatedTokensForSourceText, PER_BLOCK_OVERHEAD_TOKENS } from "./chunker";
 import type { TextTranslationItem } from "./translation-types";
 
-const MIN_BATCH_ITEMS = 1;
+export interface TextBatchOptions {
+  /** Tokens consumed by request-level context, such as a video title. */
+  inputContextTokens?: number;
+  /** Keep estimated translation output below the provider's requested limit. */
+  maxOutputTokens?: number;
+}
 
 export function batchTextItems(
   items: readonly TextTranslationItem[],
   contextWindowTokens: number,
+  options: TextBatchOptions = {},
 ): TextTranslationItem[][] {
-  const budget = computeInputTokenBudget(contextWindowTokens);
-  const batches: TextTranslationItem[][] = [];
-
-  let current: TextTranslationItem[] = [];
-  let currentTokens = 0;
-
-  for (const item of items) {
+  const inputBudget = Math.max(1, computeInputTokenBudget(contextWindowTokens) - (options.inputContextTokens ?? 0));
+  // Translation normally stays near the source-token count with the conservative
+  // estimator. Reserve a further 2x margin so a large batch cannot exceed the
+  // output cap even when the target language expands substantially.
+  const outputBudget = options.maxOutputTokens === undefined ? Number.POSITIVE_INFINITY : Math.max(1, Math.floor(options.maxOutputTokens / 2));
+  const budget = Math.min(inputBudget, outputBudget);
+  return batchItemsByTokenBudget(items, budget, (item) => {
     // Context tokens only matter when present; the marked text is always counted.
-    const tokens =
+    return (
       estimatedTokensForSourceText(item.sourceText, PER_BLOCK_OVERHEAD_TOKENS) +
       estimatedTokensForSourceText(item.contextBefore ?? "", 0) +
-      estimatedTokensForSourceText(item.contextAfter ?? "", 0);
-
-    if (current.length >= MIN_BATCH_ITEMS && currentTokens + tokens > budget) {
-      batches.push(current);
-      current = [];
-      currentTokens = 0;
-    }
-
-    current.push(item);
-    currentTokens += tokens;
-  }
-
-  if (current.length > 0) {
-    batches.push(current);
-  }
-
-  return batches;
+      estimatedTokensForSourceText(item.contextAfter ?? "", 0)
+    );
+  });
 }

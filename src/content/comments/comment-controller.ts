@@ -23,6 +23,7 @@ const COMMENT_ID_ATTRIBUTE = "data-xtranslator-comment-id";
 const MOUNT_COMMENT_TRANSLATION = XTRANSLATOR_DOM.mountCommentTranslation;
 const MOUNT_COMMENT_CONTROL = XTRANSLATOR_DOM.mountCommentControl;
 const MOUNT_BATCH_CONTROL = "comment-batch-control";
+const SCROLL_IDLE_DELAY_MS = 150;
 export class CommentTranslationController {
   private readonly commentState = new Map<string, CommentLoadState>();
   private readonly translatedTextById = new Map<string, string>();
@@ -32,7 +33,8 @@ export class CommentTranslationController {
   private watchingRoot = false;
   private scanScheduled = false;
   private scanHandle: number | null = null;
-  private readonly onScroll = (): void => this.requestScan();
+  private scrollIdleHandle: number | null = null;
+  private readonly onScroll = (): void => this.requestScrollScan();
 
   public constructor(private readonly documentNode: Document) {}
 
@@ -52,6 +54,10 @@ export class CommentTranslationController {
     if (this.scanHandle !== null) {
       this.documentNode.defaultView?.cancelAnimationFrame(this.scanHandle);
       this.scanHandle = null;
+    }
+    if (this.scrollIdleHandle !== null) {
+      this.documentNode.defaultView?.clearTimeout(this.scrollIdleHandle);
+      this.scrollIdleHandle = null;
     }
     this.scanScheduled = false;
     this.observer?.disconnect();
@@ -118,6 +124,21 @@ export class CommentTranslationController {
     }) ?? null;
   }
 
+  /** Keep the control stable while the page is moving, then re-anchor at rest. */
+  private requestScrollScan(): void {
+    const view = this.documentNode.defaultView;
+    if (!view || !this.root) {
+      return;
+    }
+    if (this.scrollIdleHandle !== null) {
+      view.clearTimeout(this.scrollIdleHandle);
+    }
+    this.scrollIdleHandle = view.setTimeout(() => {
+      this.scrollIdleHandle = null;
+      this.requestScan();
+    }, SCROLL_IDLE_DELAY_MS);
+  }
+
   private runScan(): void {
     if (!this.root) {
       return;
@@ -153,6 +174,14 @@ export class CommentTranslationController {
       }
     });
 
+    let button = root.querySelector<HTMLButtonElement>(
+      `[${XTRANSLATOR_DOM.mountAttribute}="${MOUNT_BATCH_CONTROL}"]`,
+    );
+    // While scrolling, an existing button stays in place. Moving it only after
+    // a short idle period prevents the control from visibly jumping between rows.
+    if (button && this.scrollIdleHandle !== null) {
+      return;
+    }
     const topLevelComments = this.collectCommentElements(root).filter(
       (comment) => !comment.closest(YOUTUBE_PAGE_SELECTOR.commentRepliesContainer),
     );
@@ -166,9 +195,6 @@ export class CommentTranslationController {
     if (!firstComment) {
       return;
     }
-    let button = root.querySelector<HTMLButtonElement>(
-      `[${XTRANSLATOR_DOM.mountAttribute}="${MOUNT_BATCH_CONTROL}"]`,
-    );
     if (!button) {
       button = this.createActionButton("翻译可见评论", "翻译当前已显示的评论");
       button.setAttribute(XTRANSLATOR_DOM.mountAttribute, MOUNT_BATCH_CONTROL);
@@ -400,10 +426,12 @@ export class CommentTranslationController {
       this.setButtonState(button, "翻译中…", "loading");
     }
     try {
+      const videoTitle = this.getVideoTitle();
       const response = await chrome.runtime.sendMessage({
         type: MESSAGE_TYPE.translateText,
         scope: "comment",
         items: fresh,
+        ...(videoTitle ? { videoTitle } : {}),
       });
       if (!isTranslateTextResponse(response)) {
         throw new Error("Invalid translate-text response.");
@@ -445,6 +473,11 @@ export class CommentTranslationController {
         this.setButtonState(button, "重试未完成翻译", "error");
       }
     }
+  }
+
+  private getVideoTitle(): string | undefined {
+    const title = this.documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.title)?.textContent?.trim();
+    return title || undefined;
   }
 
   private renderStoredTranslation(commentElement: HTMLElement, commentId: string): void {
