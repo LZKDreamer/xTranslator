@@ -56,17 +56,13 @@ pnpm build
 
 ### 发布新版本
 
-发布版本前，将 `package.json` 和 `public/manifest.json` 中的 `version` 同步改为相同的 Chrome 扩展版本号（例如 `0.1.1`），然后运行：
+发布新版本只需运行：
 
 ```powershell
-pnpm package
-git add public/updates/latest.json releases/xTranslator-0.1.1.zip
-git commit -m "release: v0.1.1"
-git tag v0.1.1
-git push origin main --tags
+pnpm release -- 0.1.2
 ```
 
-打包脚本会构建扩展、生成 `releases/xTranslator-版本号.zip`，并更新 jsDelivr 所需的更新清单。安装包和更新清单必须与 tag 一起推送，jsDelivr 下载链接才会生效。GitHub Release 可作为发布说明页使用，但扩展检查和下载均只访问 jsDelivr。
+发布脚本会同步版本号、构建扩展、生成安装包、更新 jsDelivr 所需的更新清单、创建提交与 tag、推送到 GitHub，并验证 CDN 下载链接。GitHub Release 不参与该流程。完整规则见 [发布流程](docs/RELEASE_WORKFLOW.md)。
 
 ## 支持的翻译服务
 
