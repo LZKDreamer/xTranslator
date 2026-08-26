@@ -56,6 +56,26 @@ export interface YouTubePageAnchors {
   description: HTMLElement | null;
 }
 
+/**
+ * Returns the video currently addressed by a YouTube watch or Shorts URL.
+ * This is deliberately separate from player-response parsing: YouTube keeps
+ * the document alive during SPA navigation, so an old player response can be
+ * present briefly after the URL has already changed.
+ */
+export function readYouTubeRouteVideoId(href: string): string | null {
+  try {
+    const url = new URL(href);
+    if (url.pathname === "/watch") {
+      return url.searchParams.get("v") || null;
+    }
+
+    const shortsMatch = /^\/shorts\/([^/?#]+)/u.exec(url.pathname);
+    return shortsMatch?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function readYouTubeVideoSnapshot(documentNode: Document): YouTubeVideoSnapshot | null {
   const scriptTexts = Array.from(documentNode.querySelectorAll<HTMLScriptElement>(YOUTUBE_PAGE_SELECTOR.playerResponseScripts))
     .map((script) => script.textContent ?? "")

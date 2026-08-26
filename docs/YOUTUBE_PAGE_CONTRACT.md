@@ -1,4 +1,4 @@
-# YouTube 观看页数据契约
+# YouTube 视频与 Shorts 页面数据契约
 
 > 目的：记录实测页面事实，防止后续迭代根据记忆或网络示例猜测 YouTube 数据。此文档不是 YouTube 的公开 API 文档；页面结构可能改变。
 
@@ -12,7 +12,9 @@
 - 当前页面语言：中文界面
 - 字幕轨道：1 条英文自动字幕（`languageCode: en`，`vssId: a.en`，`kind: asr`）
 
-采样时页面内联脚本中存在 `var ytInitialPlayerResponse = {...}`（约 111 KB）和 `var ytInitialData = {...}`（约 551 KB）。扩展隔离世界不能假设能直接读取 `window.ytInitialPlayerResponse`；实测读取应通过内联脚本文本解析，或通过明确的 MAIN world bridge 获取并校验数据。
+采样时页面内联脚本中存在 `var ytInitialPlayerResponse = {...}`（约 111 KB）和 `var ytInitialData = {...}`（约 551 KB）。扩展隔离世界不能假设能直接读取 `window.ytInitialPlayerResponse`；实测读取应通过内联脚本文本解析，或通过明确的 MAIN world bridge 获取并校验数据。YouTube 单页切换后旧内联脚本可能暂时保留，因此 bridge 应优先读取当前播放器响应，并以地址栏视频 ID 校验；不匹配的响应不能用于挂载按钮、读取缓存或显示字幕。
+
+**Shorts 补充采样（2026-08-26）：**页面 `https://www.youtube.com/shorts/hMMWdXVsKIw` 使用 `#shorts-player`，顶部可见工具栏为 `.ytp-chrome-top-buttons`。CC、更多和全屏控件并不都以可访问的 light-DOM 子节点出现，因此扩展按钮只能挂到该工具栏并按其实际坐标定位，不能假设可以插入 CC 节点内部。评论展开面板为 `ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"]`，内部包含 `ytd-comments`、`ytd-comment-view-model`、`#content-text` 和带 `lc` 参数的评论链接。
 
 ## 视频与字幕
 
@@ -102,15 +104,15 @@ interface TranscriptSegment {
 
 | 目的 | 当前锚点 | 实现规则 |
 | --- | --- | --- |
-| 播放器 | `#movie_player` | 不修改原播放器节点结构。 |
-| 右侧控制组 | `#movie_player .ytp-right-controls` | 翻译按钮插入该容器的首位，并使用自身 data 属性防止重复。 |
+| 播放器 | `#movie_player, #shorts-player` | 不修改原播放器节点结构。普通视频使用右侧控制组；Shorts 优先使用 `.ytp-chrome-top-buttons`，播放器入口由 `settings.subtitles.shortsTranslationEnabled` 控制，默认关闭。 |
+| 右侧/顶部控制组 | `.ytp-right-controls`、`.ytp-chrome-top-buttons` | 普通视频翻译按钮插入右侧控制组首位；Shorts 插入顶部工具栏并按实际坐标定位。Shorts 开关不影响评论入口。 |
 | 原字幕按钮 | `.ytp-subtitles-button` | 先排除 `aria-disabled="true"`、`disabled` 属性和 `ytp-button-disabled` class；仅对可用按钮使用 `aria-pressed="true"` 或 `ytp-button-pressed` class 判断是否实际开启；不读取 aria 文案。全局字幕偏好不作为当前视频有无字幕的依据。仅在不改变播放器字幕状态的前提下触发字幕加载时点击。 |
-| 字幕层容器 | `#movie_player .ytp-caption-window-container` | 捕获字幕那一瞬用注入样式临时隐藏以防原生字幕闪现，捕获后恢复；当观看页字幕叠加层激活时，再由 `body.xtranslator-captions-suppressed` 隐藏以“取代”原字幕。 |
-| 扩展字幕叠加层 | `#movie_player [data-xtranslator-mount="caption"]` | 由内容脚本追加到 `#movie_player` 内；运行时按实际 `<video>` 的 viewport 矩形同步 fixed 层几何位置，高 z-index；默认读取 `.ytp-progress-bar-container` 的实际边界，使字幕卡片底边位于进度条上方 8px。双语为译文在上（默认黄色）、原文在下，共享一个紧凑字幕卡片；用户可在播放器内上下拖动卡片，位置按播放器高度比例保存。单行优先，过长在约 92% 视频宽度内换行，卡片背景约 62% 透明。 |
+| 字幕层容器 | `.ytp-caption-window-container` | 捕获字幕那一瞬用注入样式临时隐藏以防原生字幕闪现，捕获后恢复；当观看页字幕叠加层激活时，再由 `body.xtranslator-captions-suppressed` 隐藏以“取代”原字幕。 |
+| 扩展字幕叠加层 | `#movie_player [data-xtranslator-mount="caption"]`、`#shorts-player [data-xtranslator-mount="caption"]` | 由内容脚本追加到播放器内；运行时按实际 `<video>` 的 viewport 矩形映射为播放器内绝对坐标，默认读取 `.ytp-progress-bar-container` 的实际边界，使字幕卡片底边位于进度条上方 8px。双语为译文在上（默认黄色）、原文在下，共享一个紧凑字幕卡片；用户可在播放器内上下拖动卡片，位置按播放器高度比例保存。Shorts 原文固定 15px、译文固定 19px，不使用普通视频字号缩放。 |
 | 设置按钮 | `.ytp-settings-button` | 不覆盖其事件或样式。 |
 | 标题 | `ytd-watch-metadata h1` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文。 |
 | 简介 | `#description-inline-expander` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文；不能改写原简介。 |
-| 评论根节点 | `#comments` | 必须等待动态内容出现。 |
+| 评论根节点 | `#comments`、`ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"]` | 必须等待动态内容出现。播放器导航清理只移除播放器、标题、简介和字幕挂载点，不得移除评论挂载点。 |
 | 翻译可见评论批量控制 | 当前视口内第一个完整可见的顶级评论前 | 通过 `data-xtranslator-mount="comment-batch-control"` 唯一挂载；滚动或懒加载扫描时重新锚定，不调用 continuation API。 |
 
 选择器只允许集中在 `youtube-page-contract.ts` 中。每次 YouTube 变更只改适配器和契约测试，不允许让功能代码各自查询 DOM。

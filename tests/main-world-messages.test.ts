@@ -61,9 +61,11 @@ describe("main-world bridge message contract", () => {
       source: "xtranslator-content",
       type: "request-player-response",
       requestId: "xt-player-1",
+      videoId: "fixture-video-id",
     };
     expect(isRequestPlayerResponseMessage(request)).toBe(true);
     expect(isRequestPlayerResponseMessage({ ...request, requestId: "" })).toBe(false);
+    expect(isRequestPlayerResponseMessage({ ...request, videoId: "" })).toBe(false);
 
     const ready: PlayerResponseReadyMessage = {
       source: "xtranslator-main-world",

@@ -35,6 +35,7 @@ export interface RequestPlayerResponseMessage {
   source: typeof CONTENT_BRIDGE_SOURCE;
   type: "request-player-response";
   requestId: string;
+  videoId: string;
 }
 
 export type TranscriptFailureReason = "no-caption-fetch";
@@ -99,7 +100,9 @@ export function isRequestPlayerResponseMessage(value: unknown): value is Request
     value.source === CONTENT_BRIDGE_SOURCE &&
     value.type === "request-player-response" &&
     typeof value.requestId === "string" &&
-    value.requestId.length > 0;
+    value.requestId.length > 0 &&
+    typeof value.videoId === "string" &&
+    value.videoId.length > 0;
 }
 
 export function isTranscriptReadyMessage(value: unknown): value is TranscriptReadyMessage {

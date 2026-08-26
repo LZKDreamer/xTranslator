@@ -4,6 +4,7 @@ import {
   findYouTubePageAnchors,
   isYouTubeNativeCaptionsEnabled,
   removeVideoExtensionMounts,
+  readYouTubeRouteVideoId,
   shouldKeepYouTubeTranslationControl,
   shouldShowYouTubeTranslationControl,
 } from "../src/shared/youtube/youtube-page-contract";
@@ -22,6 +23,12 @@ function createSnapshot(captionTracks: YouTubeVideoSnapshot["captionTracks"]): Y
 }
 
 describe("YouTube translation control visibility", () => {
+  it("reads the addressed video from watch and Shorts routes", () => {
+    expect(readYouTubeRouteVideoId("https://www.youtube.com/watch?v=watch-video&list=PL1")).toBe("watch-video");
+    expect(readYouTubeRouteVideoId("https://www.youtube.com/shorts/short-video?feature=share")).toBe("short-video");
+    expect(readYouTubeRouteVideoId("https://www.youtube.com/results?search_query=test")).toBeNull();
+  });
+
   it("finds the Shorts player without requiring watch-page metadata", () => {
     const player = { querySelector: () => null } as unknown as HTMLElement;
     const documentNode = {

@@ -50,7 +50,7 @@ export function requestTranscriptBody(videoId: string, track: YouTubeCaptionTrac
   });
 }
 
-export function requestPlayerResponse(): Promise<unknown> {
+export function requestPlayerResponse(videoId: string): Promise<unknown> {
   return new Promise((resolve) => {
     const requestId = `xt-player-${nextRequestId += 1}`;
     const timer = window.setTimeout(() => {
@@ -58,7 +58,10 @@ export function requestPlayerResponse(): Promise<unknown> {
       resolve(null);
     }, REQUEST_TIMEOUT_MS);
     pendingPlayerResponses.set(requestId, { resolve, timer });
-    window.postMessage({ source: CONTENT_BRIDGE_SOURCE, type: "request-player-response", requestId }, window.location.origin);
+    window.postMessage(
+      { source: CONTENT_BRIDGE_SOURCE, type: "request-player-response", requestId, videoId },
+      window.location.origin,
+    );
   });
 }
 

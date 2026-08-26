@@ -32,6 +32,7 @@ const CAPTION_HIDE_STYLE_ID = "xtranslator-hide-captions";
 interface PlayerWithCaptionApi {
   setOption?: (key: string, subKey: string, value: unknown) => void;
   getOption?: (key: string, subKey: string) => unknown;
+  getPlayerResponse?: () => unknown;
 }
 
 interface CaptionState {
@@ -46,6 +47,30 @@ interface PendingCaptionCapture {
 }
 
 let pendingCaptionCapture: PendingCaptionCapture | null = null;
+
+function readPlayerResponseVideoId(response: unknown): string | null {
+  if (typeof response !== "object" || response === null) {
+    return null;
+  }
+  const videoDetails = (response as { videoDetails?: unknown }).videoDetails;
+  if (typeof videoDetails !== "object" || videoDetails === null) {
+    return null;
+  }
+  const videoId = (videoDetails as { videoId?: unknown }).videoId;
+  return typeof videoId === "string" && videoId.length > 0 ? videoId : null;
+}
+
+function readCurrentPlayerResponse(videoId: string): unknown {
+  const player = document.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.player) as (HTMLElement & PlayerWithCaptionApi) | null;
+  const candidates: unknown[] = [];
+  try {
+    candidates.push(player?.getPlayerResponse?.());
+  } catch {
+    // The player can be temporarily replaced while YouTube navigates.
+  }
+  candidates.push((window as unknown as { ytInitialPlayerResponse?: unknown }).ytInitialPlayerResponse);
+  return candidates.find((response) => readPlayerResponseVideoId(response) === videoId) ?? null;
+}
 
 // Temporarily hide the player's native caption overlay while we make the player
 // fetch a caption track, removing the visible "flash" of the original subtitles.
@@ -321,7 +346,7 @@ function installMessageListener(): void {
     }
     const message = event.data;
     if (isRequestPlayerResponseMessage(message)) {
-      const response = (window as unknown as { ytInitialPlayerResponse?: unknown }).ytInitialPlayerResponse ?? null;
+      const response = readCurrentPlayerResponse(message.videoId);
       postToContent({ source: MAIN_WORLD_BRIDGE_SOURCE, type: "player-response-ready", requestId: message.requestId, response });
       return;
     }

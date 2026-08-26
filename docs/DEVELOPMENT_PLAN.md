@@ -28,6 +28,8 @@
 
 > 轨道绑定补充（2026-08-26）：默认选择首个非 `asr` 轨道，否则选择首个可用轨道；当前实现尚未提供手动源字幕轨道选择 UI。MAIN world bridge 只在存在匹配的当前视频/轨道请求时接收字幕正文，并校验 URL 中出现的 `vss_id`、`lang`、`kind`，避免并发加载或旧请求串入当前翻译。
 
+> Shorts 支持补充（2026-08-26）：播放器适配 `#shorts-player` 与其顶部工具栏；通过 MAIN world bridge 读取 Shorts 的播放器响应以取得字幕轨道。Shorts 播放器翻译开关位于设置页“字幕显示”，默认关闭且只控制播放器入口，评论翻译保持可用。字幕层改为播放器内绝对定位，Shorts 原文固定 15px、译文固定 19px。Shorts 评论面板适配 `ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"]`；播放器导航清理不得移除评论挂载点。
+
 验收：对已验证视频可显示真实字幕轨道；切换视频不会重复注入；缓存不包含临时 `baseUrl`。
 
 > 已实现（2026-08-25）：YouTube 缺少 `captions` 或字幕轨道时仍识别为有效视频；只要当前视频存在字幕轨道，无论原生字幕按钮开启、关闭还是不可用，都显示播放器翻译按钮。仅当字幕轨道为空且字幕按钮不满足明确的 DOM 条件时才隐藏：按钮不能含 `aria-disabled="true"`、`disabled` 属性或 `ytp-button-disabled` class，并且必须含 `aria-pressed="true"` 或 `ytp-button-pressed` class。按钮首次显示前等待约 200ms 复核播放器状态，同一视频的临时不完整响应不会移除已显示按钮。YouTube 的全局“默认开启字幕”偏好不单独触发按钮显示。只有无法识别观看页时才显示页面级提示。设置页字幕模式通过 `chrome.storage.local` 变更事件同步到当前字幕叠加层，切换原文、译文或双语后无需重新翻译即可立即生效。

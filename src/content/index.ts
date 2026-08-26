@@ -26,6 +26,7 @@ import {
   findYouTubePageAnchors,
   hasExtensionMount,
   isYouTubeNativeCaptionsEnabled,
+  readYouTubeRouteVideoId,
   readYouTubeVideoSnapshot,
   removeVideoExtensionMounts,
   shouldKeepYouTubeTranslationControl,
@@ -534,6 +535,7 @@ function mountPlayerControl(
 
 class YouTubePageRuntime {
   private activeVideoId: string | null = null;
+  private routeVideoId: string | null = null;
   private mountTimer: number | undefined;
   private navigationVersion = 0;
   private mountRetryCount = 0;
@@ -541,22 +543,11 @@ class YouTubePageRuntime {
   private playerControlShownVideoId: string | null = null;
   private bridgeSnapshot: YouTubeVideoSnapshot | null = null;
   private bridgeSnapshotPending = false;
+  private bridgeSnapshotRequestId = 0;
 
   public start(): void {
-    document.addEventListener("yt-navigate-finish", () => {
-      this.navigationVersion += 1;
-      this.activeVideoId = null;
-      activeVideoTranslationRun = null;
-      this.mountRetryCount = 0;
-      this.pendingPlayerControlVideoId = null;
-      this.playerControlShownVideoId = null;
-      this.bridgeSnapshot = null;
-      this.bridgeSnapshotPending = false;
-      deactivateCaptionOverlay();
-      removeVideoExtensionMounts(document);
-      void publishVideoTranslationStatus({ phase: "idle" });
-      this.scheduleMount();
-    });
+    document.addEventListener("yt-navigate-finish", () => this.resetForVideoNavigation());
+    window.addEventListener("popstate", () => this.resetForVideoNavigation());
     new MutationObserver(() => this.scheduleMount()).observe(document.documentElement, { childList: true, subtree: true });
     this.scheduleMount();
   }
@@ -586,7 +577,33 @@ class YouTubePageRuntime {
     this.scheduleMount();
   }
 
+  private resetForVideoNavigation(): void {
+    this.navigationVersion += 1;
+    this.activeVideoId = null;
+    activeVideoTranslationRun = null;
+    this.mountRetryCount = 0;
+    this.pendingPlayerControlVideoId = null;
+    this.playerControlShownVideoId = null;
+    this.bridgeSnapshot = null;
+    this.bridgeSnapshotPending = false;
+    this.bridgeSnapshotRequestId += 1;
+    deactivateCaptionOverlay();
+    removeVideoExtensionMounts(document);
+    void publishVideoTranslationStatus({ phase: "idle" });
+    this.scheduleMount();
+  }
+
+  private isSnapshotForCurrentRoute(snapshot: YouTubeVideoSnapshot | null): snapshot is YouTubeVideoSnapshot {
+    return snapshot !== null && (this.routeVideoId === null || snapshot.videoId === this.routeVideoId);
+  }
+
   private mount(): void {
+    const routeVideoId = readYouTubeRouteVideoId(window.location.href);
+    if (routeVideoId !== this.routeVideoId) {
+      this.routeVideoId = routeVideoId;
+      this.resetForVideoNavigation();
+    }
+
     const anchors = findYouTubePageAnchors(document);
     if (!anchors) {
       this.scheduleMountRetry();
@@ -595,8 +612,10 @@ class YouTubePageRuntime {
 
     ensureContentStyle(document);
     const documentSnapshot = readYouTubeVideoSnapshot(document);
-    const snapshot = this.bridgeSnapshot ?? documentSnapshot;
-    if (!this.bridgeSnapshot && (!documentSnapshot || documentSnapshot.captionTracks.length === 0)) {
+    const currentBridgeSnapshot = this.isSnapshotForCurrentRoute(this.bridgeSnapshot) ? this.bridgeSnapshot : null;
+    const currentDocumentSnapshot = this.isSnapshotForCurrentRoute(documentSnapshot) ? documentSnapshot : null;
+    const snapshot = currentBridgeSnapshot ?? currentDocumentSnapshot;
+    if (!currentBridgeSnapshot && (!currentDocumentSnapshot || currentDocumentSnapshot.captionTracks.length === 0)) {
       this.requestBridgeSnapshot();
     }
     if (!snapshot) {
@@ -666,17 +685,26 @@ class YouTubePageRuntime {
   }
 
   private requestBridgeSnapshot(): void {
-    if (this.bridgeSnapshotPending) {
+    if (this.bridgeSnapshotPending || this.routeVideoId === null) {
       return;
     }
     this.bridgeSnapshotPending = true;
     const navigationVersion = this.navigationVersion;
-    void requestPlayerResponse().then((response) => {
-      if (navigationVersion === this.navigationVersion) {
-        this.bridgeSnapshot = parseYouTubePlayerResponse(response);
+    const routeVideoId = this.routeVideoId;
+    const requestId = this.bridgeSnapshotRequestId += 1;
+    void requestPlayerResponse(routeVideoId).then((response) => {
+      const snapshot = parseYouTubePlayerResponse(response);
+      if (
+        navigationVersion === this.navigationVersion &&
+        routeVideoId === this.routeVideoId &&
+        this.isSnapshotForCurrentRoute(snapshot)
+      ) {
+        this.bridgeSnapshot = snapshot;
       }
-      this.bridgeSnapshotPending = false;
-      this.scheduleMount();
+      if (requestId === this.bridgeSnapshotRequestId) {
+        this.bridgeSnapshotPending = false;
+        this.scheduleMount();
+      }
     });
   }
 }
