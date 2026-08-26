@@ -15,5 +15,6 @@ describe("UI language selection", () => {
   it("formats localized messages from the selected resource", () => {
     expect(translate("zh-CN", "popup.translatingCaptions", { count: 3 })).toBe("正在翻译 3 处字幕…");
     expect(translate("en", "popup.translatingCaptions", { count: 3 })).toBe("Translating 3 caption segments…");
+    expect(translate("zh-CN", "options.createApiKey", { name: "OpenAI" })).toBe("前往 OpenAI 创建 API Key");
   });
 });

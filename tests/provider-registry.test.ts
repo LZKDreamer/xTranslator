@@ -15,6 +15,7 @@ describe("provider registry", () => {
     expect(deepseek).not.toBeNull();
     expect(deepseek?.kind).toBe("openai-compatible");
     expect(deepseek?.baseUrl).toBe("https://api.deepseek.com");
+    expect(deepseek?.apiKeyUrl).toBe("https://platform.deepseek.com/api_keys");
     expect(deepseek?.models).toBeUndefined();
 
     for (const providerId of ["openai", "anthropic"]) {
@@ -27,6 +28,7 @@ describe("provider registry", () => {
     const anthropic = getProviderPreset("anthropic");
     expect(anthropic?.kind).toBe("anthropic-messages");
     expect(anthropic?.baseUrl).toBe("https://api.anthropic.com");
+    expect(anthropic?.apiKeyUrl).toBe("https://platform.claude.com/settings/keys");
   });
 
   it("discovers models through provider APIs except for the static Agnes catalog", () => {
@@ -41,6 +43,7 @@ describe("provider registry", () => {
     expect(agnes?.displayName).toBe("Agnes AI");
     expect(agnes?.kind).toBe("openai-compatible");
     expect(agnes?.baseUrl).toBe("https://apihub.agnes-ai.com/v1");
+    expect(agnes?.apiKeyUrl).toBe("https://platform.agnes-ai.com/settings/apiKeys");
     expect(agnes?.requestPath).toBe("/chat/completions");
     expect(agnes?.models).toEqual(["agnes-2.5-flash"]);
     expect(getProviderContextWindow(agnes!, "agnes-2.5-flash")).toBe(512_000);
@@ -76,5 +79,12 @@ describe("provider registry", () => {
   it("lists at least the three built-in presets", () => {
     expect(PROVIDER_PRESETS.length).toBeGreaterThanOrEqual(3);
     expect(listProviderPresets().map((preset) => preset.id)).toContain("deepseek");
+  });
+
+  it("provides an official API key creation page for every provider", () => {
+    for (const preset of PROVIDER_PRESETS) {
+      expect(preset.apiKeyUrl).toMatch(/^https:\/\//u);
+    }
+    expect(getProviderPreset("openai")?.apiKeyUrl).toBe("https://platform.openai.com/api-keys");
   });
 });

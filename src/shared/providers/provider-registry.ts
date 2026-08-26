@@ -17,6 +17,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: "deepseek",
     displayName: "DeepSeek",
+    apiKeyUrl: "https://platform.deepseek.com/api_keys",
     kind: "openai-compatible",
     baseUrl: "https://api.deepseek.com",
     modelLimits: {
@@ -30,6 +31,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: "openai",
     displayName: "OpenAI",
+    apiKeyUrl: "https://platform.openai.com/api-keys",
     kind: "openai-compatible",
     baseUrl: "https://api.openai.com",
     modelLimits: {
@@ -42,6 +44,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: "anthropic",
     displayName: "Anthropic",
+    apiKeyUrl: "https://platform.claude.com/settings/keys",
     kind: "anthropic-messages",
     baseUrl: "https://api.anthropic.com",
     modelLimits: {
@@ -54,6 +57,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   {
     id: "agnes",
     displayName: "Agnes AI",
+    apiKeyUrl: "https://platform.agnes-ai.com/settings/apiKeys",
     kind: "openai-compatible",
     baseUrl: "https://apihub.agnes-ai.com/v1",
     models: ["agnes-2.5-flash"],

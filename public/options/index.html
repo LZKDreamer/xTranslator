@@ -24,7 +24,10 @@
           <select id="provider-id" name="provider-id"></select>
           <label for="api-key" data-i18n="options.serviceKey">Service key (API Key)</label>
           <input id="api-key" name="api-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="api-key-help" />
-          <p id="api-key-help" class="help" data-i18n="options.keyHelp">Your key is stored only on this device and is used to connect to the selected translation service.</p>
+          <div class="api-key-guidance">
+            <p id="api-key-help" class="help" data-i18n="options.keyHelp">Your key is stored only on this device and is used to connect to the selected translation service.</p>
+            <a id="create-api-key" class="api-key-create-link" target="_blank" rel="noreferrer" hidden></a>
+          </div>
           <button class="secondary-button" id="load-models" type="button" disabled data-i18n="options.loadModels">Load models</button>
           <label for="model" data-i18n="options.translationModel">Translation model</label>
           <select id="model" name="model" aria-describedby="model-status"></select>

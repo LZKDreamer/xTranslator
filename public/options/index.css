@@ -252,6 +252,34 @@ button:focus-visible {
   outline-offset: var(--focus-outline-offset);
 }
 
+.api-key-guidance {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.api-key-create-link {
+  justify-self: start;
+  color: var(--color-accent-violet);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.api-key-create-link::after {
+  display: inline-block;
+  margin-left: var(--space-4);
+  content: "↗";
+}
+
+.api-key-create-link:hover {
+  text-decoration: underline;
+}
+
+.api-key-create-link:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
 .cache-list {
   display: grid;
   gap: var(--space-8);

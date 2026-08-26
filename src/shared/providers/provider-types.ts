@@ -11,6 +11,8 @@ export type ProviderKind = "openai-compatible" | "anthropic-messages";
 export interface ProviderPreset {
   id: string;
   displayName: string;
+  /** Official page where users create a service API key. */
+  apiKeyUrl: string;
   kind: ProviderKind;
   baseUrl: string;
   /** Static model list for providers without a model discovery endpoint. */

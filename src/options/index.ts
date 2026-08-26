@@ -61,6 +61,19 @@ function populateProviders(selectedId: string): void {
   }
 }
 
+function updateCreateApiKeyLink(providerId: string): void {
+  const link = queryRequired<HTMLAnchorElement>("#create-api-key");
+  const preset = getProviderPreset(providerId);
+  if (!preset) {
+    link.hidden = true;
+    return;
+  }
+
+  link.href = preset.apiKeyUrl;
+  link.textContent = t("options.createApiKey", { name: preset.displayName });
+  link.hidden = false;
+}
+
 function populateModels(models: readonly string[], current: string): string {
   const select = queryRequired<HTMLSelectElement>("#model");
   select.replaceChildren();
@@ -494,6 +507,7 @@ async function loadOptions(): Promise<void> {
   queryRequired<HTMLInputElement>("#include-context").checked = providerSettings.selection.includeContext;
   populateProviders(providerSettings.provider.providerId);
   activeProviderId = providerSettings.provider.providerId;
+  updateCreateApiKeyLink(activeProviderId);
   const resolvedModel = await loadModels(providerSettings.provider.providerId, apiKey, resolveProviderModel(providerSettings));
   if (resolvedModel && apiKey) {
     commitTranslationService();
@@ -553,6 +567,7 @@ function bindForm(): void {
     captureActiveProviderDraft();
     activeProviderId = providerSelect.value;
     const providerId = activeProviderId;
+    updateCreateApiKeyLink(providerId);
     const loadVersion = ++modelLoadVersion;
     const draft = getProviderDraft(providerId);
     apiKeyInput.value = draft.apiKey;
