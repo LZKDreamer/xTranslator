@@ -15,6 +15,8 @@ export interface SubtitleSettings {
   displayMode: CaptionDisplayMode;
   /** When true, show the player translation button on YouTube Shorts. */
   shortsTranslationEnabled: boolean;
+  /** When true, download the native JSON3 caption and translated caption JSON after a video translation completes. */
+  autoDownloadSubtitles: boolean;
   translationColor: string;
   originalColor: string;
   /** Percentage relative to the responsive default type scale. */
@@ -59,6 +61,7 @@ export const DEFAULT_PROVIDER_SETTINGS: Readonly<ProviderSettings> = {
 export const DEFAULT_SUBTITLE_SETTINGS: Readonly<SubtitleSettings> = {
   displayMode: DEFAULT_CAPTION_DISPLAY_MODE,
   shortsTranslationEnabled: false,
+  autoDownloadSubtitles: false,
   translationColor: "#ffd438",
   originalColor: "#ececf0",
   translationFontScale: 100,
@@ -214,6 +217,13 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
     return null;
   }
 
+  const autoDownloadSubtitles = value.autoDownloadSubtitles === undefined
+    ? DEFAULT_SUBTITLE_SETTINGS.autoDownloadSubtitles
+    : value.autoDownloadSubtitles;
+  if (typeof autoDownloadSubtitles !== "boolean") {
+    return null;
+  }
+
   const translationColor = value.translationColor === undefined
     ? DEFAULT_SUBTITLE_SETTINGS.translationColor
     : parseCaptionColor(value.translationColor);
@@ -237,6 +247,7 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
   return {
     displayMode,
     shortsTranslationEnabled,
+    autoDownloadSubtitles,
     translationColor,
     originalColor,
     translationFontScale,

@@ -414,6 +414,7 @@ function buildGeneralSettings(): ExtensionSettings | null {
   }
   const displayMode = parseCaptionDisplayMode(queryRequired<HTMLSelectElement>("#caption-mode").value);
   const shortsTranslationEnabled = queryRequired<HTMLInputElement>("#shorts-translation-enabled").checked;
+  const autoDownloadSubtitles = queryRequired<HTMLInputElement>("#auto-download-subtitles").checked;
   const autoTranslateTitle = queryRequired<HTMLInputElement>("#auto-translate-title").checked;
   const translationColor = queryRequired<HTMLInputElement>("#translation-color").value;
   const originalColor = queryRequired<HTMLInputElement>("#original-color").value;
@@ -434,6 +435,7 @@ function buildGeneralSettings(): ExtensionSettings | null {
       ...base.subtitles,
       displayMode,
       shortsTranslationEnabled,
+      autoDownloadSubtitles,
       translationColor,
       originalColor,
       translationFontScale,
@@ -574,6 +576,7 @@ async function loadOptions(): Promise<void> {
   queryRequired<HTMLInputElement>("#api-key").value = apiKey;
   queryRequired<HTMLSelectElement>("#caption-mode").value = providerSettings.subtitles.displayMode;
   queryRequired<HTMLInputElement>("#shorts-translation-enabled").checked = providerSettings.subtitles.shortsTranslationEnabled;
+  queryRequired<HTMLInputElement>("#auto-download-subtitles").checked = providerSettings.subtitles.autoDownloadSubtitles;
   queryRequired<HTMLInputElement>("#auto-translate-title").checked = providerSettings.page.autoTranslateTitle;
   queryRequired<HTMLInputElement>("#translation-color").value = providerSettings.subtitles.translationColor;
   queryRequired<HTMLInputElement>("#original-color").value = providerSettings.subtitles.originalColor;
@@ -603,6 +606,7 @@ function bindForm(): void {
   const loadModelsButton = queryRequired<HTMLButtonElement>("#load-models");
   const captionModeSelect = queryRequired<HTMLSelectElement>("#caption-mode");
   const shortsTranslationEnabledInput = queryRequired<HTMLInputElement>("#shorts-translation-enabled");
+  const autoDownloadSubtitlesInput = queryRequired<HTMLInputElement>("#auto-download-subtitles");
   const autoTranslateTitleInput = queryRequired<HTMLInputElement>("#auto-translate-title");
   const translationColorInput = queryRequired<HTMLInputElement>("#translation-color");
   const originalColorInput = queryRequired<HTMLInputElement>("#original-color");
@@ -623,6 +627,7 @@ function bindForm(): void {
     saveGeneralSettings();
   });
   shortsTranslationEnabledInput.addEventListener("change", saveGeneralSettings);
+  autoDownloadSubtitlesInput.addEventListener("change", saveGeneralSettings);
   autoTranslateTitleInput.addEventListener("change", saveGeneralSettings);
   translationColorInput.addEventListener("input", () => {
     updateSubtitlePreview();

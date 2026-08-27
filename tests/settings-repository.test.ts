@@ -23,6 +23,7 @@ describe("SettingsRepository", () => {
       subtitles: {
         displayMode: "bilingual",
         shortsTranslationEnabled: false,
+        autoDownloadSubtitles: false,
         translationColor: "#ffd438",
         originalColor: "#ececf0",
         translationFontScale: 100,
@@ -43,6 +44,7 @@ describe("SettingsRepository", () => {
       subtitles: {
         displayMode: "translation",
         shortsTranslationEnabled: false,
+        autoDownloadSubtitles: false,
         translationColor: "#1a2b3c",
         originalColor: "#d4e5f6",
         translationFontScale: 120,
@@ -59,6 +61,7 @@ describe("SettingsRepository", () => {
       subtitles: {
         displayMode: "translation",
         shortsTranslationEnabled: false,
+        autoDownloadSubtitles: false,
         translationColor: "#1a2b3c",
         originalColor: "#d4e5f6",
         translationFontScale: 120,

@@ -78,6 +78,11 @@
             <option value="bilingual" selected data-i18n="options.bilingual">Original + translation</option>
           </select>
           <p class="help" data-i18n="options.captionModeHelp">Choose how captions appear in videos. Changes apply to the current video immediately.</p>
+          <label class="checkbox-row" for="auto-download-subtitles">
+            <input id="auto-download-subtitles" name="auto-download-subtitles" type="checkbox" />
+            <span data-i18n="options.autoDownloadSubtitles">Automatically download caption files after translation</span>
+          </label>
+          <p class="help" data-i18n="options.autoDownloadSubtitlesHelp">Downloads the native JSON3 captions fetched by the player and the xTranslator translation result as JSON.</p>
           <div class="subtitle-style-grid" data-i18n-aria-label="options.subtitleStyle">
             <label class="subtitle-style-control" for="translation-color">
               <span data-i18n="options.translationColor">Translation color</span>

@@ -41,6 +41,7 @@ import { buildTranslationBlocks } from "../shared/translation/block-builder";
 import type { TranslationSourceSegment } from "../shared/translation/translation-types";
 import { CommentTranslationController } from "./comments/comment-controller";
 import { SelectionController } from "./selection/selection-controller";
+import { downloadSubtitleFiles } from "./subtitle-export";
 import { ensureContentStyle } from "./content-style";
 import { createChromeSettingsRepository } from "../shared/storage/settings-repository";
 import { t } from "../shared/i18n";
@@ -52,6 +53,7 @@ const TITLE_TRANSLATION_DELAY_MS = 400;
 let captionOverlay: CaptionOverlayController | null = null;
 let subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
 let shortsTranslationEnabled = DEFAULT_SUBTITLE_SETTINGS.shortsTranslationEnabled;
+let autoDownloadSubtitlesEnabled = DEFAULT_SUBTITLE_SETTINGS.autoDownloadSubtitles;
 let autoTranslateTitleEnabled = true;
 let titleTranslationSettingsReady = false;
 let pageRuntime: YouTubePageRuntime | null = null;
@@ -99,6 +101,7 @@ function bindSettingsChange(): void {
     if (settings) {
       subtitleSettings = settings.subtitles;
       shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
+      autoDownloadSubtitlesEnabled = settings.subtitles.autoDownloadSubtitles;
       autoTranslateTitleEnabled = settings.page.autoTranslateTitle;
       titleTranslationSettingsReady = true;
       captionOverlay?.setSettings(settings.subtitles);
@@ -337,7 +340,10 @@ function captionErrorMessage(result: Extract<CaptionLoadResult, { status: "error
 async function loadCaptionTranscript(
   snapshot: YouTubeVideoSnapshot,
   track: YouTubeCaptionTrack,
-): Promise<CaptionLoadResult> {
+): Promise<
+  | { status: "ready"; segments: TranslationSourceSegment[]; rawBody: string }
+  | Extract<CaptionLoadResult, { status: "error" }>
+> {
   let body: string;
   try {
     body = await requestTranscriptBody(snapshot.videoId, track);
@@ -346,7 +352,9 @@ async function loadCaptionTranscript(
   }
 
   const segments = new YouTubeTranscriptParser().parse(createCaptionTrackFingerprint(track), body);
-  return segments ? { status: "ready", segments } : { status: "error", reason: "unsupported-format", canRetry: true };
+  return segments
+    ? { status: "ready", segments, rawBody: body }
+    : { status: "error", reason: "unsupported-format", canRetry: true };
 }
 
 async function requestVideoTranslation(
@@ -492,7 +500,24 @@ function setButtonIcon(documentNode: Document, button: HTMLButtonElement, icon: 
 }
 
 function renderStatus(documentNode: Document, status: HTMLElement, tone: "info" | "success" | "error", icon: IconDefinition, spinning: boolean, message: string): void {
-  status.replaceChildren(createStatusIcon(icon, spinning), documentNode.createTextNode(message));
+  const existingIcon = status.querySelector("svg");
+  const existingMessage = status.querySelector<HTMLElement>(".xtranslator-status-text");
+  const canUpdateMessageInPlace =
+    existingIcon instanceof SVGElement &&
+    existingMessage !== null &&
+    status.dataset.icon === icon.name &&
+    status.dataset.spinning === String(spinning);
+
+  if (canUpdateMessageInPlace) {
+    existingMessage.textContent = message;
+  } else {
+    const messageNode = documentNode.createElement("span");
+    messageNode.className = "xtranslator-status-text";
+    messageNode.textContent = message;
+    status.replaceChildren(createStatusIcon(icon, spinning), messageNode);
+  }
+  status.dataset.icon = icon.name;
+  status.dataset.spinning = String(spinning);
   status.dataset.tone = tone;
   status.hidden = false;
 }
@@ -571,6 +596,19 @@ function mountPlayerControl(
       segmentCount: response.blocks.length,
       translatedCount,
     });
+    if (autoDownloadSubtitlesEnabled && track) {
+      void loadCaptionTranscript(snapshot, track).then((rawResult) => {
+        if (isCurrent()) {
+          downloadSubtitleFiles({
+            snapshot,
+            track,
+            ...(rawResult.status === "ready" ? { rawBody: rawResult.rawBody } : {}),
+            blocks: response.blocks,
+            targetLanguage: response.targetLanguage,
+          });
+        }
+      });
+    }
     return true;
   };
 
@@ -690,6 +728,15 @@ function mountPlayerControl(
                   total: response.blocks.length,
                 }),
               );
+              if (autoDownloadSubtitlesEnabled) {
+                downloadSubtitleFiles({
+                  snapshot,
+                  track,
+                  rawBody: result.rawBody,
+                  blocks: response.blocks,
+                  targetLanguage: response.targetLanguage,
+                });
+              }
               setPlayerButtonLabel(button, t("content.translateAgain"));
               await publishVideoTranslationStatus({
                 phase: "translated",
@@ -1294,6 +1341,7 @@ bindVideoTranslationProgress();
 void createChromeSettingsRepository().loadSettings().then((settings) => {
   subtitleSettings = settings.subtitles;
   shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
+  autoDownloadSubtitlesEnabled = settings.subtitles.autoDownloadSubtitles;
   autoTranslateTitleEnabled = settings.page.autoTranslateTitle;
   titleTranslationSettingsReady = true;
   captionOverlay?.setSettings(subtitleSettings);
