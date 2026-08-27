@@ -179,6 +179,8 @@ async function loadCacheList(): Promise<void> {
   const listEl = queryRequired<HTMLUListElement>("#cache-list");
   const statsEl = queryRequired<HTMLElement>("#cache-stats");
   const emptyEl = queryRequired<HTMLElement>("#cache-empty");
+  const countEl = queryRequired<HTMLElement>("#cache-count");
+  const toggleEl = queryRequired<HTMLButtonElement>("#toggle-cache-list");
 
   let response: unknown;
   try {
@@ -186,6 +188,8 @@ async function loadCacheList(): Promise<void> {
   } catch {
     listEl.replaceChildren();
     statsEl.textContent = "";
+    queryRequired<HTMLElement>("#cache-count").textContent = "";
+    queryRequired<HTMLButtonElement>("#toggle-cache-list").hidden = true;
     emptyEl.textContent = t("options.historyUnavailable");
     emptyEl.hidden = false;
     return;
@@ -194,14 +198,23 @@ async function loadCacheList(): Promise<void> {
   if (!isListCacheResponse(response)) {
     listEl.replaceChildren();
     statsEl.textContent = "";
+    countEl.textContent = "";
+    toggleEl.hidden = true;
     emptyEl.textContent = t("options.historyUnavailable");
     emptyEl.hidden = false;
     return;
   }
 
   listEl.replaceChildren();
+  listEl.dataset.expanded = cacheListExpanded ? "true" : "false";
+  countEl.textContent = t("options.historyCount", { count: response.entries.length });
   statsEl.textContent = t("options.historyStats", { count: response.entries.length, size: formatBytes(response.totalBytes) });
   emptyEl.hidden = response.entries.length > 0;
+  toggleEl.hidden = response.entries.length <= 5;
+  toggleEl.textContent = cacheListExpanded
+    ? t("options.showRecentHistory")
+    : t("options.viewAllHistory", { count: response.entries.length });
+  toggleEl.setAttribute("aria-expanded", cacheListExpanded ? "true" : "false");
 
   for (const entry of response.entries) {
     const item = document.createElement("li");
@@ -257,11 +270,47 @@ let pendingTranslationSave = false;
 let saveTimer: number | null = null;
 let saveInFlight = false;
 let modelLoadVersion = 0;
+let cacheListExpanded = false;
+
+function updateSetupSteps(): void {
+  const providerId = queryRequired<HTMLSelectElement>("#provider-id").value.trim();
+  const apiKey = queryRequired<HTMLInputElement>("#api-key").value.trim();
+  const model = queryRequired<HTMLSelectElement>("#model").value.trim();
+  const draft = getProviderDraft(providerId);
+  const modelReady = Boolean(model && apiKey && draft.modelLoadedForApiKey === apiKey);
+  const steps = [
+    {
+      id: "provider-step",
+      state: providerId ? "complete" : "current",
+      status: providerId ? t("options.stepComplete") : t("options.stepCurrent"),
+    },
+    {
+      id: "api-key-step",
+      state: apiKey ? "complete" : providerId ? "current" : "pending",
+      status: apiKey ? t("options.stepComplete") : t("options.stepNeedsApiKey"),
+    },
+    {
+      id: "model-step",
+      state: modelReady ? "complete" : apiKey ? "current" : "pending",
+      status: modelReady ? t("options.stepComplete") : t("options.stepNeedsModel"),
+    },
+  ] as const;
+
+  for (const step of steps) {
+    const element = queryRequired<HTMLElement>(`#${step.id}`);
+    element.dataset.stepState = step.state;
+    const status = element.querySelector<HTMLElement>(".setup-step-status");
+    if (status) {
+      status.textContent = step.status;
+    }
+  }
+}
 
 function setTranslationStatus(message: string, state: "info" | "success" | "error" = "info"): void {
   const status = queryRequired<HTMLElement>("#model-status");
   status.textContent = message;
   status.dataset.state = state;
+  updateSetupSteps();
 }
 
 async function loadUpdate(): Promise<void> {
@@ -319,6 +368,29 @@ function updateLoadModelsButton(): void {
   const button = queryRequired<HTMLButtonElement>("#load-models");
   const apiKey = queryRequired<HTMLInputElement>("#api-key").value.trim();
   button.disabled = !apiKey;
+}
+
+function updateSubtitlePreview(): void {
+  const stage = queryRequired<HTMLElement>("#subtitle-preview-stage");
+  const mode = parseCaptionDisplayMode(queryRequired<HTMLSelectElement>("#caption-mode").value);
+  if (mode) {
+    stage.dataset.mode = mode;
+  }
+  stage.style.setProperty("--preview-translation-color", queryRequired<HTMLInputElement>("#translation-color").value);
+  stage.style.setProperty("--preview-original-color", queryRequired<HTMLInputElement>("#original-color").value);
+  stage.style.setProperty(
+    "--preview-translation-scale",
+    String(Number(queryRequired<HTMLInputElement>("#translation-font-scale").value) / 100),
+  );
+  stage.style.setProperty(
+    "--preview-original-scale",
+    String(Number(queryRequired<HTMLInputElement>("#original-font-scale").value) / 100),
+  );
+}
+
+function syncSelectionContextControl(): void {
+  const selectionEnabled = queryRequired<HTMLInputElement>("#selection-enabled").checked;
+  queryRequired<HTMLInputElement>("#include-context").disabled = !selectionEnabled;
 }
 
 function captureActiveProviderDraft(): void {
@@ -508,11 +580,14 @@ async function loadOptions(): Promise<void> {
   queryRequired<HTMLInputElement>("#translation-font-scale").value = String(providerSettings.subtitles.translationFontScale);
   queryRequired<HTMLInputElement>("#original-font-scale").value = String(providerSettings.subtitles.originalFontScale);
   updateSubtitleFontScaleLabels();
+  updateSubtitlePreview();
   queryRequired<HTMLInputElement>("#selection-enabled").checked = providerSettings.selection.enabled;
   queryRequired<HTMLInputElement>("#include-context").checked = providerSettings.selection.includeContext;
+  syncSelectionContextControl();
   populateProviders(providerSettings.provider.providerId);
   activeProviderId = providerSettings.provider.providerId;
   updateCreateApiKeyLink(activeProviderId);
+  updateSetupSteps();
   const resolvedModel = await loadModels(providerSettings.provider.providerId, apiKey, resolveProviderModel(providerSettings));
   if (resolvedModel && apiKey) {
     commitTranslationService();
@@ -540,22 +615,37 @@ function bindForm(): void {
     const providerId = providerSelect.value;
     const draft = getProviderDraft(providerId);
     providerDrafts.set(providerId, { ...draft, model: modelSelect.value });
+    updateSetupSteps();
     commitTranslationService();
   });
-  captionModeSelect.addEventListener("change", saveGeneralSettings);
+  captionModeSelect.addEventListener("change", () => {
+    updateSubtitlePreview();
+    saveGeneralSettings();
+  });
   shortsTranslationEnabledInput.addEventListener("change", saveGeneralSettings);
   autoTranslateTitleInput.addEventListener("change", saveGeneralSettings);
-  translationColorInput.addEventListener("input", saveGeneralSettings);
-  originalColorInput.addEventListener("input", saveGeneralSettings);
+  translationColorInput.addEventListener("input", () => {
+    updateSubtitlePreview();
+    saveGeneralSettings();
+  });
+  originalColorInput.addEventListener("input", () => {
+    updateSubtitlePreview();
+    saveGeneralSettings();
+  });
   translationFontScaleInput.addEventListener("input", () => {
     updateSubtitleFontScaleLabels();
+    updateSubtitlePreview();
     saveGeneralSettings();
   });
   originalFontScaleInput.addEventListener("input", () => {
     updateSubtitleFontScaleLabels();
+    updateSubtitlePreview();
     saveGeneralSettings();
   });
-  selectionEnabledInput.addEventListener("change", saveGeneralSettings);
+  selectionEnabledInput.addEventListener("change", () => {
+    syncSelectionContextControl();
+    saveGeneralSettings();
+  });
   includeContextInput.addEventListener("change", saveGeneralSettings);
   apiKeyInput.addEventListener("input", () => {
     const providerId = providerSelect.value;
@@ -607,7 +697,14 @@ function bindForm(): void {
   queryRequired<HTMLButtonElement>("#refresh-cache").addEventListener("click", () => {
     void loadCacheList();
   });
+  queryRequired<HTMLButtonElement>("#toggle-cache-list").addEventListener("click", () => {
+    cacheListExpanded = !cacheListExpanded;
+    void loadCacheList();
+  });
   queryRequired<HTMLButtonElement>("#clear-all-cache").addEventListener("click", () => {
+    if (!window.confirm(t("options.confirmClearHistory"))) {
+      return;
+    }
     void chrome.runtime
       .sendMessage({ type: MESSAGE_TYPE.clearAllCache })
       .then(() => loadCacheList())
@@ -619,6 +716,7 @@ function bindForm(): void {
     translationFontScaleInput.value = String(DEFAULT_SUBTITLE_SETTINGS.translationFontScale);
     originalFontScaleInput.value = String(DEFAULT_SUBTITLE_SETTINGS.originalFontScale);
     updateSubtitleFontScaleLabels();
+    updateSubtitlePreview();
     const base = pendingSettings ?? inFlightSettings ?? committedSettings;
     const displayMode = parseCaptionDisplayMode(captionModeSelect.value);
     if (base && displayMode) {

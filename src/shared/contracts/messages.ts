@@ -10,6 +10,7 @@ export const MESSAGE_TYPE = {
   translateVideo: "translate-video",
   translateVideoProgress: "translate-video-progress",
   translateText: "translate-text",
+  translateTextProgress: "translate-text-progress",
   translateSelectionFromContext: "translate-selection-from-context",
   getCacheStats: "get-cache-stats",
   listCache: "list-cache",
@@ -105,10 +106,21 @@ export type TextTranslationScope = "comment" | "selection" | "title" | "descript
 
 export interface TranslateTextMessage {
   type: typeof MESSAGE_TYPE.translateText;
+  runId?: string;
   scope: TextTranslationScope;
   items: TextTranslationItem[];
   /** Read-only page context used only for comment translation. */
   videoTitle?: string;
+}
+
+export interface TranslateTextProgressMessage {
+  type: typeof MESSAGE_TYPE.translateTextProgress;
+  runId: string;
+  scope: TextTranslationScope;
+  completed: number;
+  total: number;
+  translated: number;
+  failed: number;
 }
 
 export type TranslateTextResponse =
@@ -249,6 +261,32 @@ function parseTextTranslationItem(value: unknown): TextTranslationItem | null {
     sourceText: value.sourceText,
     ...(typeof value.contextBefore === "string" ? { contextBefore: value.contextBefore } : {}),
     ...(typeof value.contextAfter === "string" ? { contextAfter: value.contextAfter } : {}),
+  };
+}
+
+function parseTranslateTextProgress(value: unknown): TranslateTextProgressMessage | null {
+  if (!isRecord(value) || value.type !== MESSAGE_TYPE.translateTextProgress) {
+    return null;
+  }
+  const isCount = (key: "completed" | "total" | "translated" | "failed"): boolean =>
+    typeof value[key] === "number" && Number.isSafeInteger(value[key] as number) && (value[key] as number) >= 0;
+  if (
+    typeof value.runId !== "string" || !value.runId ||
+    (value.scope !== "comment" && value.scope !== "selection" && value.scope !== "title" && value.scope !== "description") ||
+    !isCount("completed") || !isCount("total") || !isCount("translated") || !isCount("failed") ||
+    (value.completed as number) > (value.total as number) ||
+    (value.translated as number) + (value.failed as number) > (value.completed as number)
+  ) {
+    return null;
+  }
+  return {
+    type: MESSAGE_TYPE.translateTextProgress,
+    runId: value.runId,
+    scope: value.scope,
+    completed: value.completed as number,
+    total: value.total as number,
+    translated: value.translated as number,
+    failed: value.failed as number,
   };
 }
 
@@ -430,6 +468,7 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
       }
       return {
         type: MESSAGE_TYPE.translateText,
+        ...(typeof value.runId === "string" && value.runId ? { runId: value.runId } : {}),
         scope: value.scope,
         items,
         ...(typeof value.videoTitle === "string" ? { videoTitle: value.videoTitle } : {}),
@@ -482,6 +521,10 @@ export function isTranslateTextResponse(value: unknown): value is TranslateTextR
     );
   }
   return value.ok === false && typeof value.errorMessage === "string";
+}
+
+export function isTranslateTextProgressMessage(value: unknown): value is TranslateTextProgressMessage {
+  return parseTranslateTextProgress(value) !== null;
 }
 
 export function isSettingsMessageResponse(value: unknown): value is SettingsMessageResponse {

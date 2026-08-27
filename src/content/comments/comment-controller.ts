@@ -9,7 +9,7 @@
 // never issue a duplicate request, and the translation is drawn *below* the
 // original text node (the original is never rewritten).
 
-import { isTranslateTextResponse, MESSAGE_TYPE } from "../../shared/contracts/messages";
+import { isTranslateTextProgressMessage, isTranslateTextResponse, MESSAGE_TYPE } from "../../shared/contracts/messages";
 import { createBrandMark } from "../../shared/brand-assets";
 import type { TextTranslationItem } from "../../shared/translation/translation-types";
 import { buildThread, collectCommentBranch, dedupeComments, commentsToTextItems } from "../../shared/youtube/comment-grouping";
@@ -35,12 +35,32 @@ export class CommentTranslationController {
   private scanScheduled = false;
   private scanHandle: number | null = null;
   private scrollIdleHandle: number | null = null;
+  private activeTranslationRunId: string | null = null;
+  private activeTranslationButton: HTMLButtonElement | null = null;
   private readonly onScroll = (): void => this.requestScrollScan();
+  private readonly onTextTranslationProgress = (message: unknown): void => {
+    if (
+      !isTranslateTextProgressMessage(message) ||
+      message.scope !== "comment" ||
+      message.runId !== this.activeTranslationRunId ||
+      !this.activeTranslationButton
+    ) {
+      return;
+    }
+    this.setButtonState(
+      this.activeTranslationButton,
+      t("comment.translatingProgress", { completed: message.completed, total: message.total }),
+      "loading",
+    );
+  };
 
   public constructor(private readonly documentNode: Document) {}
 
   public start(): void {
     this.documentNode.defaultView?.addEventListener("scroll", this.onScroll, true);
+    if (typeof chrome !== "undefined") {
+      chrome.runtime?.onMessage?.addListener(this.onTextTranslationProgress);
+    }
     this.watchForRoot();
   }
 
@@ -52,6 +72,9 @@ export class CommentTranslationController {
 
   public stop(): void {
     this.documentNode.defaultView?.removeEventListener("scroll", this.onScroll, true);
+    if (typeof chrome !== "undefined") {
+      chrome.runtime?.onMessage?.removeListener(this.onTextTranslationProgress);
+    }
     if (this.scanHandle !== null) {
       this.documentNode.defaultView?.cancelAnimationFrame(this.scanHandle);
       this.scanHandle = null;
@@ -69,6 +92,8 @@ export class CommentTranslationController {
     this.commentState.clear();
     this.translatedTextById.clear();
     this.commentItemById.clear();
+    this.activeTranslationRunId = null;
+    this.activeTranslationButton = null;
     this.documentNode
       .querySelectorAll<HTMLElement>(
         `[${XTRANSLATOR_DOM.mountAttribute}="${MOUNT_COMMENT_TRANSLATION}"],` +
@@ -164,7 +189,7 @@ export class CommentTranslationController {
     root.querySelectorAll<HTMLElement>("button.xtranslator-comment-action").forEach((element) => {
       if (element.getAttribute(XTRANSLATOR_DOM.mountAttribute) !== MOUNT_BATCH_CONTROL) {
         const label = element.querySelector<HTMLElement>(".xtranslator-comment-action-label");
-        if (label?.textContent === t("comment.translateVisible")) {
+        if (label?.textContent?.startsWith(t("comment.translateVisiblePrefix"))) {
           element.remove();
         }
       }
@@ -191,10 +216,20 @@ export class CommentTranslationController {
     if (!firstComment) {
       return;
     }
+    const visibleCount = this.collectVisibleComments().length;
     if (!button) {
-      button = this.createActionButton(t("comment.translateVisible"), t("comment.translateVisibleAria"));
+      button = this.createActionButton(
+        t("comment.translateVisible", { count: visibleCount }),
+        t("comment.translateVisibleAria", { count: visibleCount }),
+      );
       button.setAttribute(XTRANSLATOR_DOM.mountAttribute, MOUNT_BATCH_CONTROL);
       button.addEventListener("click", () => void this.translateVisibleBatch(button!));
+    } else if (button.dataset.state !== "loading" && button.dataset.state !== "error") {
+      this.setActionButtonLabel(
+        button,
+        t("comment.translateVisible", { count: visibleCount }),
+        t("comment.translateVisibleAria", { count: visibleCount }),
+      );
     }
     // YouTube virtualizes the comment list. Keep the action beside the first
     // rendered top-level comment so loading a later page never strands the
@@ -297,9 +332,13 @@ export class CommentTranslationController {
     row.querySelectorAll<HTMLElement>('[data-action="thread-toggle"], .xtranslator-comment-thread-label').forEach(
       (element) => element.remove(),
     );
+    const threadButtonCount = comment.isReply ? group.replies.length : threadComments.length;
 
     if (!row.querySelector('[data-action="thread"]')) {
-      const threadButton = this.createActionButton(t("comment.translateThread"), t("comment.translateThread"));
+      const threadButton = this.createActionButton(
+        t("comment.translateThread", { count: threadButtonCount }),
+        t("comment.translateThreadAria", { count: threadButtonCount }),
+      );
       threadButton.dataset.action = "thread";
       // YouTube delegates reply toggles from the thread container. Do not let an
       // interaction with our button bubble into that handler.
@@ -311,6 +350,15 @@ export class CommentTranslationController {
         void this.translateCurrentThread(commentElement, threadButton);
       }, true);
       row.append(threadButton);
+    } else {
+      const threadButton = row.querySelector<HTMLButtonElement>('[data-action="thread"]');
+      if (threadButton && threadButton.dataset.state !== "loading" && threadButton.dataset.state !== "error") {
+        this.setActionButtonLabel(
+          threadButton,
+          t("comment.translateThread", { count: threadButtonCount }),
+          t("comment.translateThreadAria", { count: threadButtonCount }),
+        );
+      }
     }
   }
 
@@ -324,10 +372,24 @@ export class CommentTranslationController {
     const group = commentId ? buildThread(threadComments, commentId) : null;
     if (!group || group.replies.length === 0) {
       this.setButtonState(button, t("comment.noExpandedReplies"), "error");
-      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, t("comment.translateThread"), "done"), 1800);
+      const threadButtonCount = group?.root.isReply ? group.replies.length : threadComments.length;
+      this.documentNode.defaultView?.setTimeout(
+        () => this.setActionButtonLabel(
+          button,
+          t("comment.translateThread", { count: threadButtonCount }),
+          t("comment.translateThreadAria", { count: threadButtonCount }),
+        ),
+        1800,
+      );
       return;
     }
-    await this.requestTranslation(commentsToTextItems(threadComments), button, t("comment.translateThread"));
+    await this.requestTranslation(
+      commentsToTextItems(threadComments),
+      button,
+      t("comment.translatedThread", {
+        count: group.root.isReply ? group.replies.length : threadComments.length,
+      }),
+    );
   }
 
   private async translateVisibleBatch(button: HTMLButtonElement): Promise<void> {
@@ -342,11 +404,20 @@ export class CommentTranslationController {
     if (candidates.length === 0) {
       // Surface feedback instead of silently doing nothing, so an extraction miss
       // is visible. Reset to the idle label shortly after.
-      this.setButtonState(button, t("comment.noTranslatableComments"), "error");
-      this.documentNode.defaultView?.setTimeout(() => this.setButtonState(button, t("comment.translateVisible"), "done"), 1800);
+      this.setButtonState(
+        button,
+        all.length > 0
+          ? t("comment.translatedVisible", { count: all.length })
+          : t("comment.noTranslatableComments"),
+        "done",
+      );
       return;
     }
-    await this.requestTranslation(commentsToTextItems(candidates), button, t("comment.translateVisible"));
+    await this.requestTranslation(
+      commentsToTextItems(candidates),
+      button,
+      t("comment.translatedVisible", { count: candidates.length }),
+    );
   }
 
   private collectVisibleComments(): RenderedComment[] {
@@ -402,7 +473,7 @@ export class CommentTranslationController {
   private async requestTranslation(
     items: TextTranslationItem[],
     button: HTMLButtonElement | null,
-    doneLabel = t("comment.translateVisible"),
+    doneLabel = t("comment.translatedVisible", { count: 0 }),
   ): Promise<void> {
     const fresh: TextTranslationItem[] = [];
     for (const item of items) {
@@ -419,12 +490,16 @@ export class CommentTranslationController {
     }
 
     if (button) {
-      this.setButtonState(button, t("comment.translating"), "loading");
+      this.setButtonState(button, t("comment.translatingProgress", { completed: 0, total: fresh.length }), "loading");
     }
+    const runId = `comment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    this.activeTranslationRunId = runId;
+    this.activeTranslationButton = button;
     try {
       const videoTitle = this.getVideoTitle();
       const response = await chrome.runtime.sendMessage({
         type: MESSAGE_TYPE.translateText,
+        runId,
         scope: "comment",
         items: fresh,
         ...(videoTitle ? { videoTitle } : {}),
@@ -456,7 +531,13 @@ export class CommentTranslationController {
         }
       }
       if (button) {
-        this.setButtonState(button, hasFailure ? t("comment.retryIncomplete") : doneLabel, hasFailure ? "error" : "done");
+        this.setButtonState(
+          button,
+          hasFailure
+            ? t("comment.retryIncompleteCount", { count: fresh.filter((item) => failedIds.has(item.id)).length })
+            : doneLabel,
+          hasFailure ? "error" : "done",
+        );
       }
     } catch {
       // Keep every item retryable. A provider failure must not make successful
@@ -466,7 +547,12 @@ export class CommentTranslationController {
         this.renderTranslation(item.id, "", "failed");
       }
       if (button) {
-        this.setButtonState(button, t("comment.retryIncomplete"), "error");
+        this.setButtonState(button, t("comment.retryIncompleteCount", { count: fresh.length }), "error");
+      }
+    } finally {
+      if (this.activeTranslationRunId === runId) {
+        this.activeTranslationRunId = null;
+        this.activeTranslationButton = null;
       }
     }
   }
@@ -549,7 +635,7 @@ export class CommentTranslationController {
         if (!item) {
           return;
         }
-        this.setButtonState(retryButton, t("comment.translating"), "loading");
+        this.setButtonState(retryButton, t("comment.translatingProgress", { completed: 0, total: 1 }), "loading");
         void this.requestTranslation([item], retryButton, t("comment.retried"));
       }, true);
       node.replaceChildren(retryButton);
@@ -578,13 +664,18 @@ export class CommentTranslationController {
     return button;
   }
 
-  private setButtonState(button: HTMLButtonElement, label: string, state: "loading" | "done" | "error"): void {
+  private setActionButtonLabel(button: HTMLButtonElement, label: string, ariaLabel: string): void {
     const labelElement = button.querySelector<HTMLElement>(".xtranslator-comment-action-label");
     if (labelElement) {
       labelElement.textContent = label;
     } else {
       button.textContent = label;
     }
+    button.setAttribute("aria-label", ariaLabel);
+  }
+
+  private setButtonState(button: HTMLButtonElement, label: string, state: "loading" | "done" | "error"): void {
+    this.setActionButtonLabel(button, label, label);
     button.dataset.state = state;
     button.disabled = state === "loading";
     button.setAttribute("aria-busy", state === "loading" ? "true" : "false");

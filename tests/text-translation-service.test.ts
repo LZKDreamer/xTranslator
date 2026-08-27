@@ -166,6 +166,24 @@ describe("TextTranslationService", () => {
     expect(calls).toBeGreaterThanOrEqual(1);
   });
 
+  it("reports completed and failed item counts after each batch", async () => {
+    const progress: { completed: number; total: number; translated: number; failed: number }[] = [];
+    const adapter = makeAdapter(async (req) => {
+      const ids = idsFromPrompt(req.userPrompt);
+      return { ok: true, text: ids.map((id) => line(id, `译：${id}`)).join("\n") };
+    });
+
+    await new TextTranslationService().translate(
+      [
+        { id: "c1", sourceText: "hello" },
+        { id: "c2", sourceText: "world" },
+      ],
+      { ...context(adapter), onProgress: (value) => progress.push(value) },
+    );
+
+    expect(progress).toEqual([{ completed: 2, total: 2, translated: 2, failed: 0 }]);
+  });
+
   it("batches comments by token budget and includes the video title", async () => {
     const prompts: string[] = [];
     const adapter = makeAdapter(async (req) => {

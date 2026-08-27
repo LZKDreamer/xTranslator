@@ -17,9 +17,32 @@
         </div>
       </header>
       <form id="settings-form" class="options-form">
-        <section class="settings-panel" aria-labelledby="provider-title">
+        <section class="settings-panel settings-panel-provider" aria-labelledby="provider-title">
           <h2 id="provider-title" data-i18n="options.translationService">Translation service</h2>
           <p class="help" data-i18n="options.serviceHelp">Enter a service key and load a model. Your settings are saved automatically when all three fields are complete.</p>
+          <ol class="setup-steps" data-i18n-aria-label="options.setupSteps">
+            <li id="provider-step" class="setup-step" data-step-state="current">
+              <span class="setup-step-index">1</span>
+              <span class="setup-step-content">
+                <strong data-i18n="options.stepProvider">Provider</strong>
+                <span class="setup-step-status" data-step-status="provider"></span>
+              </span>
+            </li>
+            <li id="api-key-step" class="setup-step" data-step-state="pending">
+              <span class="setup-step-index">2</span>
+              <span class="setup-step-content">
+                <strong data-i18n="options.stepApiKey">API Key</strong>
+                <span class="setup-step-status" data-step-status="api-key"></span>
+              </span>
+            </li>
+            <li id="model-step" class="setup-step" data-step-state="pending">
+              <span class="setup-step-index">3</span>
+              <span class="setup-step-content">
+                <strong data-i18n="options.stepModel">Model</strong>
+                <span class="setup-step-status" data-step-status="model"></span>
+              </span>
+            </li>
+          </ol>
           <label for="provider-id" data-i18n="options.translationService">Translation service</label>
           <select id="provider-id" name="provider-id"></select>
           <label for="api-key" data-i18n="options.serviceKey">Service key (API Key)</label>
@@ -36,6 +59,18 @@
 
         <section class="settings-panel" aria-labelledby="subtitles-title">
           <h2 id="subtitles-title" data-i18n="options.subtitleDisplay">Caption display</h2>
+          <div class="subtitle-preview" aria-labelledby="subtitle-preview-title">
+            <div class="subtitle-preview-header">
+              <span id="subtitle-preview-title" class="preview-label" data-i18n="options.subtitlePreview">Live preview</span>
+              <span class="preview-device" data-i18n="options.previewPlayer">Player</span>
+            </div>
+            <div id="subtitle-preview-stage" class="subtitle-preview-stage" data-mode="bilingual">
+              <div class="subtitle-preview-card">
+                <span id="subtitle-preview-translation" class="subtitle-preview-line subtitle-preview-translation" data-i18n="options.previewTranslation">The answer is already in the details.</span>
+                <span id="subtitle-preview-original" class="subtitle-preview-line subtitle-preview-original" data-i18n="options.previewOriginal">答案就在细节里。</span>
+              </div>
+            </div>
+          </div>
           <label for="caption-mode" data-i18n="options.captionMode">Caption mode</label>
           <select id="caption-mode" name="caption-mode">
             <option value="original" data-i18n="options.originalOnly">Original only</option>
@@ -43,11 +78,6 @@
             <option value="bilingual" selected data-i18n="options.bilingual">Original + translation</option>
           </select>
           <p class="help" data-i18n="options.captionModeHelp">Choose how captions appear in videos. Changes apply to the current video immediately.</p>
-          <label class="checkbox-row" for="shorts-translation-enabled">
-            <input id="shorts-translation-enabled" name="shorts-translation-enabled" type="checkbox" />
-            <span data-i18n="options.enableShortsTranslation">Enable Shorts translation</span>
-          </label>
-          <p class="help" data-i18n="options.shortsTranslationHelp">When disabled, the translation button is hidden in Shorts. Comment translation remains available.</p>
           <div class="subtitle-style-grid" data-i18n-aria-label="options.subtitleStyle">
             <label class="subtitle-style-control" for="translation-color">
               <span data-i18n="options.translationColor">Translation color</span>
@@ -73,41 +103,54 @@
         </section>
 
         <section class="settings-panel" aria-labelledby="page-translation-title">
-          <h2 id="page-translation-title" data-i18n="options.pageTranslation">Page translation</h2>
+          <h2 id="page-translation-title" data-i18n="options.viewTranslation">Viewing-page translation</h2>
+          <label class="checkbox-row" for="shorts-translation-enabled">
+            <input id="shorts-translation-enabled" name="shorts-translation-enabled" type="checkbox" />
+            <span data-i18n="options.enableShortsTranslation">Enable Shorts translation</span>
+          </label>
+          <p class="help" data-i18n="options.shortsTranslationHelp">When disabled, the translation button is hidden in Shorts. Comment translation remains available.</p>
           <label class="checkbox-row" for="auto-translate-title">
             <input id="auto-translate-title" name="auto-translate-title" type="checkbox" checked />
             <span data-i18n="options.autoTranslateTitle">Automatically translate video titles</span>
           </label>
           <p class="help" data-i18n="options.autoTranslateTitleHelp">Shows the original title immediately, then displays its translation below when ready.</p>
-        </section>
-
-        <section class="settings-panel" aria-labelledby="selection-title">
-          <h2 id="selection-title" data-i18n="options.selectionTranslation">Selection translation</h2>
           <label class="checkbox-row" for="selection-enabled">
             <input id="selection-enabled" name="selection-enabled" type="checkbox" checked />
             <span data-i18n="options.enableSelectionTranslation">Enable selection translation</span>
           </label>
           <p class="help" data-i18n="options.selectionDisabledHelp">When disabled, selecting text will not show the translation panel and the context menu will not start a translation.</p>
-          <label class="checkbox-row" for="include-context">
-            <input id="include-context" name="include-context" type="checkbox" />
-            <span data-i18n="options.includeContext">Use surrounding context when translating selected text</span>
-          </label>
-          <p class="help" data-i18n="options.includeContextHelp">When enabled, the surrounding sentences help produce a more natural translation.</p>
+          <div class="nested-setting">
+            <label class="checkbox-row" for="include-context">
+              <input id="include-context" name="include-context" type="checkbox" />
+              <span data-i18n="options.includeContext">Use surrounding context when translating selected text</span>
+            </label>
+            <p class="help" data-i18n="options.includeContextHelp">When enabled, the surrounding sentences help produce a more natural translation.</p>
+          </div>
         </section>
 
-        <section class="settings-panel" aria-labelledby="cache-title">
-          <h2 id="cache-title" data-i18n="options.translationHistory">Translation history</h2>
+        <section class="settings-panel data-maintenance-panel" aria-labelledby="data-maintenance-title">
+          <h2 id="data-maintenance-title" data-i18n="options.dataMaintenance">Data &amp; maintenance</h2>
+          <section class="settings-subpanel" aria-labelledby="cache-title">
+            <div class="settings-subpanel-heading">
+              <div>
+                <h3 id="cache-title" data-i18n="options.translationHistory">Translation history</h3>
+                <p class="help" data-i18n="options.historyHelp">Recent entries are shown first. Open the full list when needed.</p>
+              </div>
+              <span id="cache-count" class="section-count"></span>
+            </div>
           <p id="cache-stats" class="help" aria-live="polite"></p>
           <ul id="cache-list" class="cache-list"></ul>
           <p id="cache-empty" class="status-message" data-i18n="options.emptyHistory">No translation history has been saved.</p>
+          <button class="text-button" id="toggle-cache-list" type="button" hidden></button>
           <div class="actions">
             <button class="secondary-button" id="refresh-cache" type="button" data-i18n="options.reload">Reload</button>
             <button class="secondary-button" id="clear-all-cache" type="button" data-i18n="options.clearHistory">Clear history</button>
           </div>
-        </section>
-
-        <section class="settings-panel" aria-labelledby="version-update-title">
-          <h2 id="version-update-title" data-i18n="options.versionUpdate">Version update</h2>
+          </section>
+          <section class="settings-subpanel" aria-labelledby="version-update-title">
+            <div class="settings-subpanel-heading">
+              <h3 id="version-update-title" data-i18n="options.versionUpdate">Version update</h3>
+            </div>
           <dl class="version-update-details">
             <div>
               <dt data-i18n="options.currentVersion">Current version</dt>
@@ -120,6 +163,7 @@
           </dl>
           <p id="version-update-status" class="status-message" role="status" aria-live="polite"></p>
           <a id="options-download-update" class="update-link" target="_blank" rel="noreferrer" hidden data-i18n="options.downloadUpdate">Download update</a>
+          </section>
         </section>
 
       </form>

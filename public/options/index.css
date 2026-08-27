@@ -102,6 +102,204 @@ h1 span {
   -webkit-backdrop-filter: blur(var(--blur-glass));
 }
 
+.settings-panel > h2 {
+  margin-bottom: 2px;
+}
+
+.setup-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.setup-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  min-width: 0;
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+  border: 1px solid rgba(63, 78, 123, 0.14);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.setup-step[data-step-state="current"] {
+  color: var(--color-text-primary);
+  border-color: rgba(120, 101, 255, 0.38);
+  background: var(--surface-accent);
+}
+
+.setup-step[data-step-state="complete"] {
+  color: var(--color-text-primary);
+  border-color: rgba(51, 214, 255, 0.34);
+}
+
+.setup-step[data-step-state="error"] {
+  color: var(--color-danger);
+  border-color: rgba(192, 54, 44, 0.28);
+}
+
+.setup-step-index {
+  display: grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  color: var(--color-text-secondary);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  place-items: center;
+}
+
+.setup-step[data-step-state="current"] .setup-step-index,
+.setup-step[data-step-state="complete"] .setup-step-index {
+  color: var(--color-text-on-dark);
+  background: var(--color-accent-violet);
+}
+
+.setup-step-content {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.setup-step-content strong {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.setup-step-status {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-step[data-step-state="error"] .setup-step-status {
+  color: var(--color-danger);
+}
+
+.subtitle-preview {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: var(--border-input);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.subtitle-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.preview-label,
+.preview-device {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.preview-device {
+  font-weight: var(--font-weight-regular);
+}
+
+.subtitle-preview-stage {
+  position: relative;
+  min-height: 132px;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(47, 63, 96, 0.72), rgba(17, 22, 38, 0.9)),
+    radial-gradient(circle at 24% 20%, rgba(51, 214, 255, 0.35), transparent 42%),
+    #141827;
+}
+
+.subtitle-preview-card {
+  position: absolute;
+  right: 8%;
+  bottom: 18px;
+  left: 8%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 14px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.62);
+  text-align: center;
+}
+
+.subtitle-preview-line {
+  display: block;
+  width: 100%;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  overflow-wrap: break-word;
+}
+
+.subtitle-preview-translation {
+  color: var(--preview-translation-color, #ffd438);
+  font-size: calc(18px * var(--preview-translation-scale, 1));
+  font-weight: 700;
+}
+
+.subtitle-preview-original {
+  color: var(--preview-original-color, #ececf0);
+  font-size: calc(14px * var(--preview-original-scale, 1));
+}
+
+.subtitle-preview-stage[data-mode="original"] .subtitle-preview-translation,
+.subtitle-preview-stage[data-mode="translation"] .subtitle-preview-original {
+  display: none;
+}
+
+.settings-subpanel {
+  display: grid;
+  gap: var(--space-12);
+  padding-top: var(--space-8);
+}
+
+.settings-subpanel + .settings-subpanel {
+  padding-top: var(--space-16);
+  border-top: 1px solid rgba(90, 106, 151, 0.12);
+}
+
+.settings-subpanel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.settings-panel h3 {
+  margin: 0;
+  font-size: var(--font-size-body);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.section-count {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  color: var(--color-accent-violet);
+  border-radius: 999px;
+  background: var(--surface-accent);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
 label {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
@@ -195,6 +393,22 @@ select {
   border-radius: 8px;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
+}
+
+.nested-setting {
+  display: grid;
+  gap: var(--space-4);
+  margin-left: var(--space-16);
+  padding-left: var(--space-12);
+  border-left: 2px solid rgba(120, 101, 255, 0.22);
+}
+
+.nested-setting:has(input:disabled) {
+  opacity: 0.58;
+}
+
+.nested-setting input:disabled {
+  cursor: not-allowed;
 }
 
 .checkbox-row input[type="checkbox"] {
@@ -295,6 +509,16 @@ button:focus-visible {
   list-style: none;
 }
 
+.cache-list[data-expanded="true"] {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cache-list:not([data-expanded="true"]) .cache-item:nth-child(n + 6) {
+  display: none;
+}
+
 .cache-item {
   display: flex;
   align-items: center;
@@ -349,6 +573,28 @@ button:focus-visible {
   padding-top: var(--space-12);
   margin-top: var(--space-8);
   border-top: 1px solid rgba(90, 106, 151, 0.12);
+}
+
+.text-button {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 var(--space-8);
+  color: var(--color-accent-violet);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.text-button:hover {
+  background: var(--surface-accent);
+}
+
+.text-button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
 }
 
 .secondary-button {
@@ -473,6 +719,10 @@ button:focus-visible {
 }
 
 @media (max-width: 560px) {
+  .setup-steps {
+    grid-template-columns: 1fr;
+  }
+
   .subtitle-style-grid {
     grid-template-columns: 1fr;
   }

@@ -155,7 +155,7 @@ async function handleGetVideoTranslationCache(message: { videoId: string }): Pro
   };
 }
 
-async function handleTranslateText(message: TranslateTextMessage): Promise<TranslateTextResponse> {
+async function handleTranslateText(message: TranslateTextMessage, tabId?: number): Promise<TranslateTextResponse> {
   const { settings, resolvedTargetLocale } = await getSettingsResponse();
   const skippedIds = message.items
     .filter((item) => !shouldTranslateText(item.sourceText, resolvedTargetLocale))
@@ -193,6 +193,18 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
     model,
     ...(message.scope === "comment" && message.videoTitle ? { videoTitle: message.videoTitle } : {}),
     maxConcurrentBatches: message.scope === "comment" ? COMMENT_BATCH_CONCURRENCY : 1,
+    ...(tabId !== undefined && message.runId
+      ? {
+          onProgress: (progress) => {
+            void chrome.tabs.sendMessage(tabId, {
+              type: MESSAGE_TYPE.translateTextProgress,
+              runId: message.runId,
+              scope: message.scope,
+              ...progress,
+            }).catch(() => undefined);
+          },
+        }
+      : {}),
   });
 
   if (!run.ok) {
@@ -324,7 +336,7 @@ if (typeof chrome !== "undefined") {
           .catch(() => reportAsyncFailure(sendResponse, t("background.videoFailed")));
         return true;
       case "translate-text":
-        void handleTranslateText(parsedMessage)
+        void handleTranslateText(parsedMessage, sender.tab?.id)
           .then(sendResponse)
           .catch(() => reportAsyncFailure(sendResponse, t("background.translationFailed")));
         return true;

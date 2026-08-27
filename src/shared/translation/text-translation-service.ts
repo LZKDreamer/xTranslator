@@ -39,6 +39,14 @@ export interface TextTranslationContext {
   videoTitle?: string;
   /** Limits simultaneous provider calls. */
   maxConcurrentBatches?: number;
+  onProgress?: (progress: TextTranslationProgress) => void;
+}
+
+export interface TextTranslationProgress {
+  completed: number;
+  total: number;
+  translated: number;
+  failed: number;
 }
 
 export type TextTranslationRun =
@@ -69,7 +77,7 @@ export class TextTranslationService {
       maxOutputTokens,
     });
 
-    const batchRuns = await this.translateBatches(batches, context, maxOutputTokens);
+    const batchRuns = await this.translateBatches(batches, context, maxOutputTokens, translatableItems.length);
     for (const { run } of batchRuns) {
       if (!run.ok) {
         return run;
@@ -147,8 +155,12 @@ export class TextTranslationService {
     batches: readonly TextTranslationItem[][],
     context: TextTranslationContext,
     maxOutputTokens: number | undefined,
+    total: number,
   ): Promise<{ batch: readonly TextTranslationItem[]; run: TextBatchRun }[]> {
     const results: { batch: readonly TextTranslationItem[]; run: TextBatchRun }[] = [];
+    let completed = 0;
+    let translated = 0;
+    let failed = 0;
     const workerCount = Math.min(
       batches.length,
       Math.max(1, Math.floor(context.maxConcurrentBatches ?? 1)),
@@ -159,7 +171,16 @@ export class TextTranslationService {
         const index = nextIndex;
         nextIndex += 1;
         const batch = batches[index]!;
-        results[index] = { batch, run: await this.translateBatch(batch, context, maxOutputTokens) };
+        const run = await this.translateBatch(batch, context, maxOutputTokens);
+        results[index] = { batch, run };
+        completed += batch.length;
+        if (run.ok) {
+          translated += run.translations.length;
+          failed += run.missingIds.length;
+        } else {
+          failed += batch.length;
+        }
+        context.onProgress?.({ completed, total, translated, failed });
       }
     };
     await Promise.all(Array.from({ length: workerCount }, () => worker()));

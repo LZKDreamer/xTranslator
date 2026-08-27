@@ -56,7 +56,15 @@ let autoTranslateTitleEnabled = true;
 let titleTranslationSettingsReady = false;
 let pageRuntime: YouTubePageRuntime | null = null;
 let nextVideoTranslationRunId = 0;
-let activeVideoTranslationRun: { runId: string; videoId: string; sourceTrackFingerprint: string } | null = null;
+let activeVideoTranslationRun: {
+  runId: string;
+  videoId: string;
+  videoTitle: string;
+  sourceTrackFingerprint: string;
+  segmentCount: number;
+  translatedBlockIds: Set<string>;
+  status: HTMLElement;
+} | null = null;
 
 function getExtensionSettings(value: unknown) {
   return parseExtensionSettings(value);
@@ -227,6 +235,13 @@ function createDescriptionTranslationContainer(documentNode: Document): HTMLDivE
   result.className = "xtranslator-description-result";
   result.setAttribute("data-xtranslator-description-result", "");
   result.hidden = true;
+  const resultLabel = documentNode.createElement("span");
+  resultLabel.className = "xtranslator-description-label";
+  resultLabel.setAttribute("data-xtranslator-description-label", "");
+  const resultText = documentNode.createElement("div");
+  resultText.className = "xtranslator-description-result-text";
+  resultText.setAttribute("data-xtranslator-description-result-text", "");
+  result.append(resultLabel, resultText);
 
   container.append(button, result);
   container.hidden = true;
@@ -245,7 +260,9 @@ function setDescriptionActionLabel(button: HTMLButtonElement, label: string): vo
 function renderDescriptionTranslation(container: HTMLElement, run: DescriptionTranslationRun): void {
   const button = container.querySelector<HTMLButtonElement>("[data-xtranslator-description-action]");
   const result = container.querySelector<HTMLElement>("[data-xtranslator-description-result]");
-  if (!button || !result) {
+  const resultLabel = container.querySelector<HTMLElement>("[data-xtranslator-description-label]");
+  const resultText = container.querySelector<HTMLElement>("[data-xtranslator-description-result-text]");
+  if (!button || !result || !resultLabel || !resultText) {
     return;
   }
 
@@ -256,20 +273,24 @@ function renderDescriptionTranslation(container: HTMLElement, run: DescriptionTr
   switch (run.state) {
     case "idle":
       setDescriptionActionLabel(button, t("content.translateDescription"));
-      result.textContent = "";
+      resultLabel.textContent = "";
+      resultText.textContent = "";
       break;
     case "loading":
       setDescriptionActionLabel(button, t("content.translatingDescription"));
-      result.textContent = "";
+      resultLabel.textContent = "";
+      resultText.textContent = "";
       break;
     case "done":
       setDescriptionActionLabel(button, t(run.translationVisible ? "content.hideDescriptionTranslation" : "content.showDescriptionTranslation"));
-      result.textContent = `${t("content.descriptionTranslation")}\n${run.translatedText ?? ""}`;
+      resultLabel.textContent = t("content.descriptionTranslation");
+      resultText.textContent = run.translatedText ?? "";
       break;
     case "failed":
       setDescriptionActionLabel(button, t("content.translateDescription"));
       result.hidden = false;
-      result.textContent = t("content.descriptionTranslationFailed");
+      resultLabel.textContent = "";
+      resultText.textContent = t("content.descriptionTranslationFailed");
       break;
   }
 }
@@ -374,6 +395,25 @@ function bindVideoTranslationProgress(): void {
     const overlay = getCaptionOverlay(document, anchors.player);
     overlay.append([message.block]);
     overlay.setMode(message.displayMode);
+    active.translatedBlockIds.add(message.block.id);
+    renderStatus(
+      document,
+      active.status,
+      "info",
+      LoaderCircle,
+      true,
+      t("content.translatingProgress", {
+        translated: active.translatedBlockIds.size,
+        total: active.segmentCount,
+      }),
+    );
+    void publishVideoTranslationStatus({
+      phase: "translating",
+      videoId: active.videoId,
+      videoTitle: active.videoTitle,
+      segmentCount: active.segmentCount,
+      translatedCount: active.translatedBlockIds.size,
+    });
     return false;
   });
 }
@@ -457,10 +497,6 @@ function renderStatus(documentNode: Document, status: HTMLElement, tone: "info" 
   status.hidden = false;
 }
 
-function partialTranslationMessage(): string {
-  return t("content.partialTranslation");
-}
-
 function mountPlayerControl(
   documentNode: Document,
   anchors: YouTubePageAnchors,
@@ -516,7 +552,17 @@ function mountPlayerControl(
     overlay.load(response.blocks);
     overlay.setMode(response.displayMode);
     const translatedCount = response.blocks.filter((block) => block.translatedText.trim()).length;
-    renderStatus(documentNode, status, "success", Check, false, t("content.cacheLoaded", { count: response.blocks.length }));
+    renderStatus(
+      documentNode,
+      status,
+      "success",
+      Check,
+      false,
+      t("content.translationCompleteProgress", {
+        translated: translatedCount,
+        total: response.blocks.length,
+      }),
+    );
     setPlayerButtonLabel(button, t("content.translateAgain"));
     await publishVideoTranslationStatus({
       phase: "translated",
@@ -576,7 +622,11 @@ function mountPlayerControl(
       activeVideoTranslationRun = {
         runId,
         videoId: snapshot.videoId,
+        videoTitle: snapshot.title,
         sourceTrackFingerprint: createCaptionTrackFingerprint(track),
+        segmentCount: 0,
+        translatedBlockIds: new Set(),
+        status,
       };
       renderStatus(documentNode, status, "info", LoaderCircle, true, t("content.readingCaptions"));
       await publishVideoTranslationStatus({ phase: "reading-captions", videoId: snapshot.videoId, videoTitle: snapshot.title });
@@ -587,6 +637,18 @@ function mountPlayerControl(
       if (result.status === "ready") {
         const translationBlockCount = await resolveTranslationBlockCount(result.segments, track.languageCode);
         renderStatus(documentNode, status, "info", LoaderCircle, true, t("content.translatingSegments", { count: translationBlockCount }));
+        if (activeVideoTranslationRun?.runId === runId) {
+          activeVideoTranslationRun.segmentCount = translationBlockCount;
+          activeVideoTranslationRun.translatedBlockIds.clear();
+          renderStatus(
+            documentNode,
+            status,
+            "info",
+            LoaderCircle,
+            true,
+            t("content.translatingProgress", { translated: 0, total: translationBlockCount }),
+          );
+        }
         await publishVideoTranslationStatus({
           phase: "translating",
           videoId: snapshot.videoId,
@@ -617,7 +679,17 @@ function mountPlayerControl(
               overlay.setMode(response.displayMode);
 
               const translatedCount = response.blocks.length - response.missingIds.length;
-              renderStatus(documentNode, status, "success", Check, false, t("content.translationComplete", { count: response.blocks.length }));
+              renderStatus(
+                documentNode,
+                status,
+                "success",
+                Check,
+                false,
+                t("content.translationCompleteProgress", {
+                  translated: translatedCount,
+                  total: response.blocks.length,
+                }),
+              );
               setPlayerButtonLabel(button, t("content.translateAgain"));
               await publishVideoTranslationStatus({
                 phase: "translated",
@@ -628,19 +700,24 @@ function mountPlayerControl(
               });
             }
           } else {
-            if (response.partial) {
-              const overlay = getCaptionOverlay(documentNode, anchors.player);
-              overlay.load(response.partial.blocks);
-              overlay.setMode(response.partial.displayMode);
-              setPlayerButtonLabel(button, t("content.continueTranslation"));
-              renderStatus(
-                documentNode,
-                status,
-                "error",
-                CircleAlert,
-                false,
-                partialTranslationMessage(),
-              );
+              if (response.partial) {
+                const overlay = getCaptionOverlay(documentNode, anchors.player);
+                overlay.load(response.partial.blocks);
+                overlay.setMode(response.partial.displayMode);
+                setPlayerButtonLabel(button, t("content.continueTranslation"));
+                const translatedCount = response.partial.blocks.length - response.partial.missingIds.length;
+                renderStatus(
+                  documentNode,
+                  status,
+                  "error",
+                  CircleAlert,
+                  false,
+                  t("content.partialTranslationProgress", {
+                    translated: translatedCount,
+                    total: response.partial.blocks.length,
+                    missing: response.partial.missingIds.length,
+                  }),
+                );
             } else {
               setPlayerButtonLabel(button, t("content.retry"));
               renderStatus(documentNode, status, "error", CircleAlert, false, response.errorMessage);
