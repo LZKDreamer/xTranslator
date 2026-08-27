@@ -52,7 +52,11 @@ function findOwnedElement<T extends Element>(commentElement: Element, selector: 
 }
 
 export function findCommentsRoot(documentNode: Document): HTMLElement | null {
-  return documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.commentsRoot);
+  const roots = Array.from(documentNode.querySelectorAll<HTMLElement>(YOUTUBE_PAGE_SELECTOR.commentsRoot));
+  return roots.find((root) => root.querySelector(YOUTUBE_PAGE_SELECTOR.comment) !== null)
+    ?? roots.find((root) => root.matches(YOUTUBE_PAGE_SELECTOR.shortsCommentsRoot))
+    ?? roots[0]
+    ?? null;
 }
 
 function extractCommentText(element: Element): string {

@@ -10,6 +10,8 @@ export const YOUTUBE_PAGE_SELECTOR = {
   progressBarContainer: ".ytp-progress-bar-container",
   title: "ytd-watch-metadata h1, ytd-reel-player-header-renderer #title",
   description: "#description-inline-expander, ytd-reel-player-header-renderer #description",
+  descriptionText: "#description-inline-expander #expanded > yt-attributed-string",
+  descriptionCollapse: "#description-inline-expander #collapse",
   subtitleButton: ".ytp-subtitles-button",
   captionWindow: ".ytp-caption-window-container",
   playerResponseScripts: "script",
@@ -17,6 +19,7 @@ export const YOUTUBE_PAGE_SELECTOR = {
   // A Short opens comments in an engagement panel. Depending on the current
   // YouTube rollout, the panel either contains `#comments` or is itself the
   // stable root while comments are hydrated lazily.
+  shortsCommentsRoot: "ytd-reel-engagement-panel-section-renderer ytd-comments, ytd-reel-engagement-panel-section-renderer[target-id='engagement-panel-comments-section'], ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-comments-section']",
   commentsRoot: "#comments, ytd-reel-engagement-panel-section-renderer ytd-comments, ytd-reel-engagement-panel-section-renderer[target-id='engagement-panel-comments-section'], ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-comments-section']",
   // The comment element tag changed to `ytd-comment-view-model`; keep the older
   // `ytd-comment-renderer` as a fallback so the adapter tolerates both layouts.
@@ -74,6 +77,30 @@ export function readYouTubeRouteVideoId(href: string): string | null {
   } catch {
     return null;
   }
+}
+
+export function isYouTubeShortsRoute(href: string): boolean {
+  try {
+    return new URL(href).pathname.startsWith("/shorts/");
+  } catch {
+    return false;
+  }
+}
+
+export function isYouTubeWatchRoute(href: string): boolean {
+  try {
+    return new URL(href).pathname === "/watch";
+  } catch {
+    return false;
+  }
+}
+
+export function findYouTubeExpandedDescriptionText(documentNode: Document): HTMLElement | null {
+  const collapseButton = documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.descriptionCollapse);
+  if (!collapseButton || collapseButton.getClientRects().length === 0) {
+    return null;
+  }
+  return documentNode.querySelector<HTMLElement>(YOUTUBE_PAGE_SELECTOR.descriptionText);
 }
 
 export function readYouTubeVideoSnapshot(documentNode: Document): YouTubeVideoSnapshot | null {

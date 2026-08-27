@@ -101,7 +101,7 @@ export type TranslateVideoResponse =
       };
     };
 
-export type TextTranslationScope = "comment" | "selection";
+export type TextTranslationScope = "comment" | "selection" | "title" | "description";
 
 export interface TranslateTextMessage {
   type: typeof MESSAGE_TYPE.translateText;
@@ -414,7 +414,7 @@ export function parseExtensionMessage(value: unknown): ExtensionMessage | null {
       };
     }
     case MESSAGE_TYPE.translateText: {
-      if (value.scope !== "comment" && value.scope !== "selection") {
+      if (value.scope !== "comment" && value.scope !== "selection" && value.scope !== "title" && value.scope !== "description") {
         return null;
       }
       if (!Array.isArray(value.items) || value.items.length === 0) {
@@ -501,6 +501,8 @@ export function isSettingsMessageResponse(value: unknown): value is SettingsMess
     Object.values(settings.providerModels).every((model) => typeof model === "string") &&
     isRecord(settings.subtitles) &&
     parseCaptionDisplayMode(settings.subtitles.displayMode) !== null &&
+    isRecord(settings.page) &&
+    typeof settings.page.autoTranslateTitle === "boolean" &&
     isRecord(settings.selection) &&
     typeof settings.selection.enabled === "boolean" &&
     typeof settings.selection.includeContext === "boolean"

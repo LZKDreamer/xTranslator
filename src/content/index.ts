@@ -2,6 +2,7 @@ import { Check, CircleAlert, createElement, LoaderCircle, type IconDefinition } 
 import { createBrandMark } from "../shared/brand-assets";
 import {
   isSettingsMessageResponse,
+  isTranslateTextResponse,
   isVideoTranslationCacheResponse,
   isTranslateVideoProgressMessage,
   isTranslateVideoResponse,
@@ -23,9 +24,11 @@ import { CaptionOverlayController } from "./caption-overlay";
 import {
   XTRANSLATOR_DOM,
   findExtensionMount,
+  findYouTubeExpandedDescriptionText,
   findYouTubePageAnchors,
   hasExtensionMount,
   isYouTubeNativeCaptionsEnabled,
+  isYouTubeWatchRoute,
   readYouTubeRouteVideoId,
   readYouTubeVideoSnapshot,
   removeVideoExtensionMounts,
@@ -44,10 +47,13 @@ import { t } from "../shared/i18n";
 
 const PAGE_UNSUPPORTED_MESSAGE = t("content.pageUnsupported");
 const PLAYER_CONTROL_CONFIRMATION_DELAY_MS = 200;
+const TITLE_TRANSLATION_DELAY_MS = 400;
 
 let captionOverlay: CaptionOverlayController | null = null;
 let subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
 let shortsTranslationEnabled = DEFAULT_SUBTITLE_SETTINGS.shortsTranslationEnabled;
+let autoTranslateTitleEnabled = true;
+let titleTranslationSettingsReady = false;
 let pageRuntime: YouTubePageRuntime | null = null;
 let nextVideoTranslationRunId = 0;
 let activeVideoTranslationRun: { runId: string; videoId: string; sourceTrackFingerprint: string } | null = null;
@@ -85,7 +91,10 @@ function bindSettingsChange(): void {
     if (settings) {
       subtitleSettings = settings.subtitles;
       shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
+      autoTranslateTitleEnabled = settings.page.autoTranslateTitle;
+      titleTranslationSettingsReady = true;
       captionOverlay?.setSettings(settings.subtitles);
+      pageRuntime?.invalidateDescriptionTranslationAvailability();
       pageRuntime?.refresh();
     }
   });
@@ -100,9 +109,169 @@ function createMount(documentNode: Document, mount: string, className: string): 
 
 function createTranslationContainer(documentNode: Document, mount: string): HTMLDivElement {
   const container = createMount(documentNode, mount, "xtranslator-translation");
+  if (mount === XTRANSLATOR_DOM.mountTitle) {
+    container.classList.add("xtranslator-title-translation");
+  }
   container.hidden = true;
   container.setAttribute("aria-live", "polite");
   return container;
+}
+
+type TitleTranslationState = "waiting" | "checking" | "loading" | "done" | "failed" | "skipped";
+
+interface TitleTranslationRun {
+  videoId: string;
+  itemId: string;
+  sourceText: string;
+  state: TitleTranslationState;
+  translatedText?: string;
+}
+
+type DescriptionTranslationState = "idle" | "loading" | "done" | "failed";
+
+interface DescriptionTranslationRun {
+  videoId: string;
+  itemId: string;
+  sourceText: string;
+  sourceLines: string[];
+  state: DescriptionTranslationState;
+  translatedText?: string;
+  translationVisible: boolean;
+}
+
+function renderTitleTranslation(container: HTMLElement, run: TitleTranslationRun, onRetry?: () => void): void {
+  container.dataset.state = run.state;
+  if (run.state === "waiting" || run.state === "checking" || run.state === "skipped") {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  switch (run.state) {
+    case "loading":
+      if (container.textContent !== t("content.translatingTitle") || container.childElementCount > 0) {
+        container.textContent = t("content.translatingTitle");
+      }
+      break;
+    case "done":
+      if (container.textContent !== (run.translatedText ?? "") || container.childElementCount > 0) {
+        container.textContent = run.translatedText ?? "";
+      }
+      break;
+    case "failed":
+      if (!onRetry) {
+        if (container.textContent !== t("content.titleTranslationFailed") || container.childElementCount > 0) {
+          container.textContent = t("content.titleTranslationFailed");
+        }
+        break;
+      }
+      if (container.querySelector<HTMLButtonElement>("[data-xtranslator-title-retry]")) {
+        break;
+      }
+      const failureMessage = container.ownerDocument.createElement("span");
+      failureMessage.textContent = t("content.titleTranslationFailed");
+      const retryButton = container.ownerDocument.createElement("button");
+      retryButton.type = "button";
+      retryButton.className = "xtranslator-title-retry";
+      retryButton.setAttribute("data-xtranslator-title-retry", "");
+      retryButton.textContent = t("content.retryTitleTranslation");
+      retryButton.addEventListener("click", onRetry);
+      container.replaceChildren(failureMessage, retryButton);
+      break;
+  }
+}
+
+function getDescriptionTranslationItems(run: DescriptionTranslationRun): { id: string; sourceText: string }[] {
+  return run.sourceLines.flatMap((sourceText, index) => {
+    const text = sourceText.trim();
+    return text ? [{ id: `${run.itemId}-${index}`, sourceText: text }] : [];
+  });
+}
+
+function reassembleDescriptionTranslation(
+  run: DescriptionTranslationRun,
+  translations: Record<string, string>,
+  skippedIds: readonly string[] = [],
+): string | null {
+  const skipped = new Set(skippedIds);
+  let missingTranslation = false;
+  const translatedLines = run.sourceLines.map((sourceText, index) => {
+    if (!sourceText.trim()) {
+      return sourceText;
+    }
+    const itemId = `${run.itemId}-${index}`;
+    if (skipped.has(itemId)) {
+      return sourceText;
+    }
+    const translatedText = translations[itemId]?.trim();
+    if (!translatedText) {
+      missingTranslation = true;
+      return sourceText;
+    }
+    return translatedText;
+  });
+  return missingTranslation ? null : translatedLines.join("\n");
+}
+
+function createDescriptionTranslationContainer(documentNode: Document): HTMLDivElement {
+  const container = createMount(documentNode, XTRANSLATOR_DOM.mountDescription, "xtranslator-description-translation");
+  const button = documentNode.createElement("button");
+  button.type = "button";
+  button.className = "xtranslator-description-action";
+  button.setAttribute("data-xtranslator-description-action", "");
+  button.append(createBrandMark(documentNode, "light", 16));
+  const label = documentNode.createElement("span");
+  label.setAttribute("data-xtranslator-description-action-label", "");
+  button.append(label);
+
+  const result = documentNode.createElement("div");
+  result.className = "xtranslator-description-result";
+  result.setAttribute("data-xtranslator-description-result", "");
+  result.hidden = true;
+
+  container.append(button, result);
+  container.hidden = true;
+  container.setAttribute("aria-live", "polite");
+  return container;
+}
+
+function setDescriptionActionLabel(button: HTMLButtonElement, label: string): void {
+  button.setAttribute("aria-label", t("content.descriptionActionAria", { action: label }));
+  const labelElement = button.querySelector<HTMLElement>("[data-xtranslator-description-action-label]");
+  if (labelElement) {
+    labelElement.textContent = label;
+  }
+}
+
+function renderDescriptionTranslation(container: HTMLElement, run: DescriptionTranslationRun): void {
+  const button = container.querySelector<HTMLButtonElement>("[data-xtranslator-description-action]");
+  const result = container.querySelector<HTMLElement>("[data-xtranslator-description-result]");
+  if (!button || !result) {
+    return;
+  }
+
+  container.hidden = false;
+  container.dataset.state = run.state;
+  button.disabled = run.state === "loading";
+  result.hidden = run.state !== "done" || !run.translationVisible;
+  switch (run.state) {
+    case "idle":
+      setDescriptionActionLabel(button, t("content.translateDescription"));
+      result.textContent = "";
+      break;
+    case "loading":
+      setDescriptionActionLabel(button, t("content.translatingDescription"));
+      result.textContent = "";
+      break;
+    case "done":
+      setDescriptionActionLabel(button, t(run.translationVisible ? "content.hideDescriptionTranslation" : "content.showDescriptionTranslation"));
+      result.textContent = `${t("content.descriptionTranslation")}\n${run.translatedText ?? ""}`;
+      break;
+    case "failed":
+      setDescriptionActionLabel(button, t("content.translateDescription"));
+      result.hidden = false;
+      result.textContent = t("content.descriptionTranslationFailed");
+      break;
+  }
 }
 
 function showTranslationStatus(container: HTMLElement, message: string): void {
@@ -115,22 +284,12 @@ function mountTranslationContainers(documentNode: Document, anchors: YouTubePage
     anchors.title.insertAdjacentElement("afterend", createTranslationContainer(documentNode, XTRANSLATOR_DOM.mountTitle));
   }
 
-  if (anchors.description && !hasExtensionMount(documentNode, XTRANSLATOR_DOM.mountDescription)) {
-    anchors.description.insertAdjacentElement(
-      "afterend",
-      createTranslationContainer(documentNode, XTRANSLATOR_DOM.mountDescription),
-    );
-  }
 }
 
 function setTranslationError(documentNode: Document, message: string): void {
   const titleContainer = findExtensionMount(documentNode, XTRANSLATOR_DOM.mountTitle);
-  const descriptionContainer = findExtensionMount(documentNode, XTRANSLATOR_DOM.mountDescription);
   if (titleContainer) {
     showTranslationStatus(titleContainer, `xTranslator：${message}`);
-  }
-  if (descriptionContainer) {
-    showTranslationStatus(descriptionContainer, `xTranslator：${message}`);
   }
 }
 
@@ -544,6 +703,11 @@ class YouTubePageRuntime {
   private bridgeSnapshot: YouTubeVideoSnapshot | null = null;
   private bridgeSnapshotPending = false;
   private bridgeSnapshotRequestId = 0;
+  private titleTranslation: TitleTranslationRun | null = null;
+  private titleTranslationTimer: number | undefined;
+  private descriptionTranslation: DescriptionTranslationRun | null = null;
+  private descriptionTranslationAvailable: boolean | null = null;
+  private descriptionSettingsCheck: Promise<boolean> | null = null;
 
   public start(): void {
     document.addEventListener("yt-navigate-finish", () => this.resetForVideoNavigation());
@@ -577,6 +741,10 @@ class YouTubePageRuntime {
     this.scheduleMount();
   }
 
+  public invalidateDescriptionTranslationAvailability(): void {
+    this.descriptionTranslationAvailable = null;
+  }
+
   private resetForVideoNavigation(): void {
     this.navigationVersion += 1;
     this.activeVideoId = null;
@@ -587,6 +755,12 @@ class YouTubePageRuntime {
     this.bridgeSnapshot = null;
     this.bridgeSnapshotPending = false;
     this.bridgeSnapshotRequestId += 1;
+    this.titleTranslation = null;
+    this.descriptionTranslation = null;
+    if (this.titleTranslationTimer !== undefined) {
+      window.clearTimeout(this.titleTranslationTimer);
+      this.titleTranslationTimer = undefined;
+    }
     deactivateCaptionOverlay();
     removeVideoExtensionMounts(document);
     void publishVideoTranslationStatus({ phase: "idle" });
@@ -638,11 +812,19 @@ class YouTubePageRuntime {
       deactivateCaptionOverlay();
       removeVideoExtensionMounts(document);
       this.activeVideoId = snapshot.videoId;
+      this.titleTranslation = null;
+      this.descriptionTranslation = null;
+      if (this.titleTranslationTimer !== undefined) {
+        window.clearTimeout(this.titleTranslationTimer);
+        this.titleTranslationTimer = undefined;
+      }
       this.pendingPlayerControlVideoId = null;
       this.playerControlShownVideoId = null;
     }
 
     mountTranslationContainers(document, anchors);
+    this.mountTitleTranslation(snapshot);
+    this.mountDescriptionTranslation(snapshot);
     if (anchors.player.id === "shorts-player" && !shortsTranslationEnabled) {
       this.pendingPlayerControlVideoId = null;
       findExtensionMount(document, XTRANSLATOR_DOM.mountPlayer)?.remove();
@@ -684,6 +866,324 @@ class YouTubePageRuntime {
     );
   }
 
+  private mountTitleTranslation(snapshot: YouTubeVideoSnapshot): void {
+    const container = findExtensionMount(document, XTRANSLATOR_DOM.mountTitle);
+    if (!container) {
+      return;
+    }
+    if (
+      !isYouTubeWatchRoute(window.location.href)
+      || !titleTranslationSettingsReady
+      || !autoTranslateTitleEnabled
+    ) {
+      container.hidden = true;
+      return;
+    }
+
+    const sourceText = snapshot.title.trim();
+    if (!sourceText) {
+      container.hidden = true;
+      return;
+    }
+
+    const current = this.titleTranslation;
+    if (current?.videoId === snapshot.videoId && current.sourceText === sourceText) {
+      this.renderTitleTranslation(container, current);
+      return;
+    }
+
+    const run: TitleTranslationRun = {
+      videoId: snapshot.videoId,
+      itemId: `title-${snapshot.videoId}`,
+      sourceText,
+      state: "waiting",
+    };
+    this.titleTranslation = run;
+    this.titleTranslationTimer = window.setTimeout(() => {
+      this.titleTranslationTimer = undefined;
+      void this.startTitleTranslation(run);
+    }, TITLE_TRANSLATION_DELAY_MS);
+  }
+
+  private renderTitleTranslation(container: HTMLElement, run: TitleTranslationRun): void {
+    renderTitleTranslation(container, run, () => {
+      this.retryTitleTranslation(run);
+    });
+  }
+
+  private retryTitleTranslation(run: TitleTranslationRun): void {
+    if (
+      this.titleTranslation !== run
+      || this.activeVideoId !== run.videoId
+      || !autoTranslateTitleEnabled
+      || !isYouTubeWatchRoute(window.location.href)
+    ) {
+      return;
+    }
+    run.state = "checking";
+    const container = findExtensionMount(document, XTRANSLATOR_DOM.mountTitle);
+    if (container) {
+      this.renderTitleTranslation(container, run);
+    }
+    void this.startTitleTranslation(run);
+  }
+
+  private mountDescriptionTranslation(snapshot: YouTubeVideoSnapshot): void {
+    if (!isYouTubeWatchRoute(window.location.href)) {
+      findExtensionMount(document, XTRANSLATOR_DOM.mountDescription)?.remove();
+      return;
+    }
+
+    const source = findYouTubeExpandedDescriptionText(document);
+    const sourceText = source?.textContent?.trim() ?? "";
+    if (!source || !sourceText) {
+      findExtensionMount(document, XTRANSLATOR_DOM.mountDescription)?.remove();
+      return;
+    }
+
+    let run = this.descriptionTranslation;
+    if (run?.videoId !== snapshot.videoId || run.sourceText !== sourceText) {
+      run = {
+        videoId: snapshot.videoId,
+        itemId: `description-${snapshot.videoId}`,
+        sourceText,
+        sourceLines: sourceText.split(/\r?\n/u),
+        state: "idle",
+        translationVisible: false,
+      };
+      this.descriptionTranslation = run;
+      findExtensionMount(document, XTRANSLATOR_DOM.mountDescription)?.remove();
+    }
+
+    let container = findExtensionMount(document, XTRANSLATOR_DOM.mountDescription);
+    if (container?.nextElementSibling !== source) {
+      container?.remove();
+      container = createDescriptionTranslationContainer(document);
+      source.insertAdjacentElement("beforebegin", container);
+      container.querySelector<HTMLButtonElement>("[data-xtranslator-description-action]")?.addEventListener("click", () => {
+        this.handleDescriptionTranslationAction(run!);
+      });
+    }
+
+    if (this.descriptionTranslationAvailable !== null) {
+      container.hidden = !this.descriptionTranslationAvailable;
+      if (this.descriptionTranslationAvailable) {
+        renderDescriptionTranslation(container, run);
+      }
+      return;
+    }
+
+    container.hidden = true;
+    void this.ensureDescriptionTranslationAvailable().then((available) => {
+      if (
+        this.descriptionTranslation !== run
+        || this.activeVideoId !== run.videoId
+        || !isYouTubeWatchRoute(window.location.href)
+      ) {
+        return;
+      }
+      const currentContainer = findExtensionMount(document, XTRANSLATOR_DOM.mountDescription);
+      if (!currentContainer) {
+        return;
+      }
+      currentContainer.hidden = !available;
+      if (available) {
+        renderDescriptionTranslation(currentContainer, run);
+      }
+    });
+  }
+
+  private async ensureDescriptionTranslationAvailable(): Promise<boolean> {
+    if (this.descriptionTranslationAvailable !== null) {
+      return this.descriptionTranslationAvailable;
+    }
+    if (this.descriptionSettingsCheck) {
+      return this.descriptionSettingsCheck;
+    }
+
+    const check = (async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPE.getSettings });
+        if (!isSettingsMessageResponse(response)) {
+          this.descriptionTranslationAvailable = false;
+          return false;
+        }
+        const settings = response.settings;
+        const apiKey = settings.apiKeys[settings.provider.providerId]?.trim() ?? "";
+        this.descriptionTranslationAvailable = Boolean(apiKey && settings.provider.model.trim());
+        return this.descriptionTranslationAvailable;
+      } catch {
+        this.descriptionTranslationAvailable = false;
+        return false;
+      }
+    })();
+    this.descriptionSettingsCheck = check;
+    try {
+      return await check;
+    } finally {
+      if (this.descriptionSettingsCheck === check) {
+        this.descriptionSettingsCheck = null;
+      }
+    }
+  }
+
+  private handleDescriptionTranslationAction(run: DescriptionTranslationRun): void {
+    if (this.descriptionTranslation !== run || this.activeVideoId !== run.videoId) {
+      return;
+    }
+    if (run.state === "done") {
+      run.translationVisible = !run.translationVisible;
+      const container = findExtensionMount(document, XTRANSLATOR_DOM.mountDescription);
+      if (container) {
+        renderDescriptionTranslation(container, run);
+      }
+      return;
+    }
+    void this.startDescriptionTranslation(run);
+  }
+
+  private async startDescriptionTranslation(run: DescriptionTranslationRun): Promise<void> {
+    if (
+      this.descriptionTranslation !== run
+      || this.activeVideoId !== run.videoId
+      || !this.descriptionTranslationAvailable
+      || !isYouTubeWatchRoute(window.location.href)
+    ) {
+      return;
+    }
+
+    run.state = "loading";
+    const container = findExtensionMount(document, XTRANSLATOR_DOM.mountDescription);
+    if (container) {
+      renderDescriptionTranslation(container, run);
+    }
+
+    try {
+      const items = getDescriptionTranslationItems(run);
+      const response = await chrome.runtime.sendMessage({
+        type: MESSAGE_TYPE.translateText,
+        scope: "description",
+        items,
+      });
+      if (!isTranslateTextResponse(response) || !response.ok) {
+        run.state = "failed";
+      } else {
+        const translatedText = reassembleDescriptionTranslation(run, response.translations, response.skippedIds);
+        if (translatedText) {
+          run.state = "done";
+          run.translatedText = translatedText;
+          run.translationVisible = true;
+        } else {
+          run.state = "failed";
+        }
+      }
+    } catch {
+      run.state = "failed";
+    }
+
+    if (
+      this.descriptionTranslation !== run
+      || this.activeVideoId !== run.videoId
+      || !isYouTubeWatchRoute(window.location.href)
+    ) {
+      return;
+    }
+    const currentContainer = findExtensionMount(document, XTRANSLATOR_DOM.mountDescription);
+    if (currentContainer) {
+      renderDescriptionTranslation(currentContainer, run);
+    }
+  }
+
+  private async startTitleTranslation(run: TitleTranslationRun): Promise<void> {
+    if (
+      this.titleTranslation !== run
+      || this.activeVideoId !== run.videoId
+      || !autoTranslateTitleEnabled
+      || !isYouTubeWatchRoute(window.location.href)
+    ) {
+      return;
+    }
+
+    run.state = "checking";
+    let settingsResponse: unknown;
+    try {
+      settingsResponse = await chrome.runtime.sendMessage({ type: MESSAGE_TYPE.getSettings });
+    } catch {
+      run.state = "skipped";
+      return;
+    }
+    if (
+      this.titleTranslation !== run
+      || this.activeVideoId !== run.videoId
+      || !autoTranslateTitleEnabled
+      || !isYouTubeWatchRoute(window.location.href)
+    ) {
+      return;
+    }
+    if (!isSettingsMessageResponse(settingsResponse)) {
+      run.state = "skipped";
+      return;
+    }
+
+    const settings = settingsResponse.settings;
+    const apiKey = settings.apiKeys[settings.provider.providerId]?.trim() ?? "";
+    if (!apiKey || !settings.provider.model.trim()) {
+      run.state = "skipped";
+      return;
+    }
+
+    run.state = "loading";
+    const container = findExtensionMount(document, XTRANSLATOR_DOM.mountTitle);
+    if (container) {
+      this.renderTitleTranslation(container, run);
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPE.translateText,
+      scope: "title",
+      items: [{ id: run.itemId, sourceText: run.sourceText }],
+      });
+      if (!isTranslateTextResponse(response) || !response.ok) {
+        run.state = "failed";
+      } else {
+        const translatedText = response.translations[run.itemId]?.trim();
+        if (translatedText) {
+          run.state = "done";
+          run.translatedText = translatedText;
+        } else if (response.skippedIds?.includes(run.itemId)) {
+          run.state = "skipped";
+        } else {
+          run.state = "failed";
+        }
+      }
+
+      if (
+        this.titleTranslation !== run
+        || this.activeVideoId !== run.videoId
+        || !autoTranslateTitleEnabled
+      ) {
+        return;
+      }
+      const currentContainer = findExtensionMount(document, XTRANSLATOR_DOM.mountTitle);
+      if (currentContainer) {
+        this.renderTitleTranslation(currentContainer, run);
+      }
+    } catch {
+      if (this.titleTranslation !== run) {
+        return;
+      }
+      run.state = "failed";
+      if (this.activeVideoId !== run.videoId || !autoTranslateTitleEnabled) {
+        return;
+      }
+      const currentContainer = findExtensionMount(document, XTRANSLATOR_DOM.mountTitle);
+      if (currentContainer) {
+        this.renderTitleTranslation(currentContainer, run);
+      }
+    }
+  }
+
   private requestBridgeSnapshot(): void {
     if (this.bridgeSnapshotPending || this.routeVideoId === null) {
       return;
@@ -702,7 +1202,7 @@ class YouTubePageRuntime {
         this.bridgeSnapshot = snapshot;
       }
       if (requestId === this.bridgeSnapshotRequestId) {
-        this.bridgeSnapshotPending = false;
+      this.bridgeSnapshotPending = false;
         this.scheduleMount();
       }
     });
@@ -717,9 +1217,14 @@ bindVideoTranslationProgress();
 void createChromeSettingsRepository().loadSettings().then((settings) => {
   subtitleSettings = settings.subtitles;
   shortsTranslationEnabled = settings.subtitles.shortsTranslationEnabled;
+  autoTranslateTitleEnabled = settings.page.autoTranslateTitle;
+  titleTranslationSettingsReady = true;
   captionOverlay?.setSettings(subtitleSettings);
   pageRuntime?.refresh();
-}).catch(() => undefined);
+}).catch(() => {
+  titleTranslationSettingsReady = true;
+  pageRuntime?.refresh();
+});
 
 pageRuntime = new YouTubePageRuntime();
 pageRuntime.start();

@@ -76,8 +76,10 @@ describe("TextTranslationService", () => {
     expect(calls).toBe(0);
   });
 
-  it("reports ids the model failed to answer", async () => {
+  it("automatically retries ids the model failed to answer", async () => {
+    let calls = 0;
     const adapter = makeAdapter(async (req) => {
+      calls += 1;
       const ids = idsFromPrompt(req.userPrompt);
       return { ok: true, text: line(ids[0]!, "译") };
     });
@@ -90,9 +92,10 @@ describe("TextTranslationService", () => {
     );
     expect(run.ok).toBe(true);
     if (run.ok) {
-      expect(run.translations).toEqual({ c1: "译" });
-      expect(run.missingIds).toEqual(["c2"]);
+      expect(run.translations).toEqual({ c1: "译", c2: "译" });
+      expect(run.missingIds).toEqual([]);
     }
+    expect(calls).toBe(2);
   });
 
   it("surfaces a provider failure as an error response", async () => {
@@ -101,7 +104,7 @@ describe("TextTranslationService", () => {
     expect(run).toEqual({ ok: false, errorMessage: "服务密钥无效或权限不足，请到偏好设置检查。" });
   });
 
-  it("retries only a comment missing from a batch response", async () => {
+  it("retries missing items from every text translation batch", async () => {
     let calls = 0;
     const adapter = makeAdapter(async (req) => {
       calls += 1;
@@ -119,7 +122,7 @@ describe("TextTranslationService", () => {
         { id: "c2", sourceText: "second" },
         { id: "c3", sourceText: "third" },
       ],
-      { ...context(adapter), retryMissingItems: true },
+      context(adapter),
     );
 
     expect(calls).toBe(2);
@@ -127,16 +130,19 @@ describe("TextTranslationService", () => {
   });
 
   it("treats an empty comment translation as missing", async () => {
+    let calls = 0;
     const adapter = makeAdapter(async (req) => {
+      calls += 1;
       const id = idsFromPrompt(req.userPrompt)[0]!;
       return { ok: true, text: line(id, "   ") };
     });
 
     const run = await new TextTranslationService().translate(
       [{ id: "c1", sourceText: "hello" }],
-      { ...context(adapter), retryMissingItems: true },
+      context(adapter),
     );
 
+    expect(calls).toBe(3);
     expect(run).toEqual({ ok: true, translations: {}, missingIds: ["c1"] });
   });
 
@@ -173,7 +179,7 @@ describe("TextTranslationService", () => {
         { id: "c1", sourceText: "first" },
         { id: "c2", sourceText: "second" },
       ],
-      { ...context(adapter), videoTitle: "How to use xTranslator", retryMissingItems: true },
+      { ...context(adapter), videoTitle: "How to use xTranslator" },
     );
 
     expect(prompts).toHaveLength(1);

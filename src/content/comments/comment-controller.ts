@@ -30,8 +30,8 @@ export class CommentTranslationController {
   private readonly translatedTextById = new Map<string, string>();
   private readonly commentItemById = new Map<string, TextTranslationItem>();
   private observer: MutationObserver | null = null;
+  private rootObserver: MutationObserver | null = null;
   private root: HTMLElement | null = null;
-  private watchingRoot = false;
   private scanScheduled = false;
   private scanHandle: number | null = null;
   private scrollIdleHandle: number | null = null;
@@ -63,7 +63,8 @@ export class CommentTranslationController {
     this.scanScheduled = false;
     this.observer?.disconnect();
     this.observer = null;
-    this.watchingRoot = false;
+    this.rootObserver?.disconnect();
+    this.rootObserver = null;
     this.root = null;
     this.commentState.clear();
     this.translatedTextById.clear();
@@ -78,27 +79,21 @@ export class CommentTranslationController {
   }
 
   private watchForRoot(): void {
-    if (this.watchingRoot) {
-      return;
-    }
     const root = findCommentsRoot(this.documentNode);
     if (root) {
       this.attachRoot(root);
-      return;
     }
-    this.watchingRoot = true;
-    this.observer = new MutationObserver(() => {
+    this.rootObserver = new MutationObserver(() => {
       const found = findCommentsRoot(this.documentNode);
-      if (found) {
-        this.watchingRoot = false;
-        this.observer?.disconnect();
+      if (found && found !== this.root) {
         this.attachRoot(found);
       }
     });
-    this.observer.observe(this.documentNode.documentElement, { childList: true, subtree: true });
+    this.rootObserver.observe(this.documentNode.documentElement, { childList: true, subtree: true });
   }
 
   private attachRoot(root: HTMLElement): void {
+    this.observer?.disconnect();
     this.root = root;
     this.observer = new MutationObserver((mutations) => {
       if (mutations.some((mutation) => this.isRelevantMutation(mutation))) {

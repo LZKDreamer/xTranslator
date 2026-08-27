@@ -20,6 +20,21 @@ const CONTENT_STYLE = `
   .xtranslator-status[data-tone="error"] { background: ${DESIGN_TOKEN.color.surfaceGlassDarkStrong}; }
   .xtranslator-spin { animation: xtranslator-rotate 0.8s linear infinite; }
   .xtranslator-translation { margin-top: 8px; color: ${DESIGN_TOKEN.color.textSecondary}; font: 14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-title-translation { min-height: 40px; }
+  .xtranslator-title-translation[data-state="loading"] { opacity: .78; }
+  .xtranslator-title-translation[data-state="error"] { color: ${DESIGN_TOKEN.color.danger}; }
+  .xtranslator-title-translation[data-state="failed"] { display: flex; align-items: center; gap: 8px; color: ${DESIGN_TOKEN.color.danger}; }
+  .xtranslator-title-retry { min-height: 26px; padding: 0 9px; color: inherit; border: 1px solid currentColor; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-title-retry:hover { background: rgba(214, 48, 49, .08); }
+  .xtranslator-title-retry:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
+  .xtranslator-description-translation { margin: 12px 0 4px; }
+  .xtranslator-description-action { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 11px 0 8px; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid ${DESIGN_TOKEN.color.borderGlassDark}; border-radius: 999px; background: linear-gradient(135deg, ${DESIGN_TOKEN.color.surfaceGlassDarkStrong}, ${DESIGN_TOKEN.color.accentViolet}); box-shadow: 0 3px 10px rgba(25, 35, 69, .22); cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-description-action .xtranslator-brand-mark { width: 16px; height: 16px; flex: none; border-radius: 5px; }
+  .xtranslator-description-action:hover { box-shadow: 0 5px 14px rgba(25, 35, 69, .28); transform: translateY(-1px); }
+  .xtranslator-description-action:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
+  .xtranslator-description-action:disabled { cursor: progress; opacity: .72; }
+  .xtranslator-description-result { margin-top: 8px; padding: 8px 10px; color: ${DESIGN_TOKEN.color.textPrimary}; border-left: 3px solid ${DESIGN_TOKEN.color.accentViolet}; border-radius: 6px; background: ${DESIGN_TOKEN.color.surfaceGlassLight}; font: 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space: pre-wrap; }
+  .xtranslator-description-translation[data-state="failed"] .xtranslator-description-result { color: ${DESIGN_TOKEN.color.danger}; border-left-color: ${DESIGN_TOKEN.color.danger}; }
   .xtranslator-caption { position: absolute; inset: auto; box-sizing: border-box; z-index: 10000; padding: 0 2%; pointer-events: none; text-align: center; }
   .xtranslator-caption[hidden] { display: none; }
   .xtranslator-caption-card { position: absolute; bottom: var(--xtranslator-caption-bottom, 4.25rem); left: 50%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; width: fit-content; max-width: min(92%, 72rem); padding: 5px 14px 6px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; background: rgba(0, 0, 0, 0.62); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22); pointer-events: auto; touch-action: none; user-select: none; cursor: grab; transform: translateX(-50%); }

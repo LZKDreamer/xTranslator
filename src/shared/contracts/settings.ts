@@ -32,6 +32,11 @@ export interface SelectionSettings {
   includeContext: boolean;
 }
 
+export interface PageTranslationSettings {
+  /** When true, translate the current video's title after the page loads. */
+  autoTranslateTitle: boolean;
+}
+
 export interface ExtensionSettings {
   provider: ProviderSettings;
   /** API keys keyed by provider id. Kept per-provider so switching providers restores the saved key. */
@@ -39,6 +44,7 @@ export interface ExtensionSettings {
   /** Last successfully selected model keyed by provider id. */
   providerModels: Record<string, string>;
   subtitles: SubtitleSettings;
+  page: PageTranslationSettings;
   selection: SelectionSettings;
 }
 
@@ -65,11 +71,16 @@ export const DEFAULT_SELECTION_SETTINGS: Readonly<SelectionSettings> = {
   includeContext: false,
 };
 
+export const DEFAULT_PAGE_TRANSLATION_SETTINGS: Readonly<PageTranslationSettings> = {
+  autoTranslateTitle: true,
+};
+
 export const DEFAULT_SETTINGS: Readonly<ExtensionSettings> = {
   provider: { ...DEFAULT_PROVIDER_SETTINGS },
   apiKeys: { ...DEFAULT_API_KEYS },
   providerModels: { ...DEFAULT_PROVIDER_MODELS },
   subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
+  page: { ...DEFAULT_PAGE_TRANSLATION_SETTINGS },
   selection: { ...DEFAULT_SELECTION_SETTINGS },
 };
 
@@ -234,6 +245,19 @@ export function parseSubtitleSettings(value: unknown): SubtitleSettings | null {
   };
 }
 
+function parsePageTranslationSettings(value: unknown): PageTranslationSettings | null {
+  if (value === undefined) {
+    return { ...DEFAULT_PAGE_TRANSLATION_SETTINGS };
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+  const autoTranslateTitle = value.autoTranslateTitle === undefined
+    ? DEFAULT_PAGE_TRANSLATION_SETTINGS.autoTranslateTitle
+    : value.autoTranslateTitle;
+  return typeof autoTranslateTitle === "boolean" ? { autoTranslateTitle } : null;
+}
+
 function parseCaptionColor(value: unknown): string | null {
   return typeof value === "string" && /^#[0-9a-f]{6}$/iu.test(value) ? value.toLowerCase() : null;
 }
@@ -299,10 +323,15 @@ export function parseExtensionSettings(value: unknown): ExtensionSettings | null
     return null;
   }
 
+  const page = parsePageTranslationSettings(value.page);
+  if (!page) {
+    return null;
+  }
+
   const selection = parseSelectionSettings(value.selection);
   if (!selection) {
     return null;
   }
 
-  return { provider, apiKeys, providerModels, subtitles, selection };
+  return { provider, apiKeys, providerModels, subtitles, page, selection };
 }

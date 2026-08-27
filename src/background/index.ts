@@ -192,7 +192,6 @@ async function handleTranslateText(message: TranslateTextMessage): Promise<Trans
     apiKey,
     model,
     ...(message.scope === "comment" && message.videoTitle ? { videoTitle: message.videoTitle } : {}),
-    retryMissingItems: message.scope === "comment",
     maxConcurrentBatches: message.scope === "comment" ? COMMENT_BATCH_CONCURRENCY : 1,
   });
 

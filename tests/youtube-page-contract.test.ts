@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   YOUTUBE_PAGE_SELECTOR,
   findYouTubePageAnchors,
+  isYouTubeShortsRoute,
+  isYouTubeWatchRoute,
   isYouTubeNativeCaptionsEnabled,
   removeVideoExtensionMounts,
   readYouTubeRouteVideoId,
   shouldKeepYouTubeTranslationControl,
   shouldShowYouTubeTranslationControl,
 } from "../src/shared/youtube/youtube-page-contract";
+import { findCommentsRoot } from "../src/content/comments/comment-dom";
 import type { YouTubeVideoSnapshot } from "../src/shared/youtube/youtube-types";
 
 function createSnapshot(captionTracks: YouTubeVideoSnapshot["captionTracks"]): YouTubeVideoSnapshot {
@@ -27,6 +30,10 @@ describe("YouTube translation control visibility", () => {
     expect(readYouTubeRouteVideoId("https://www.youtube.com/watch?v=watch-video&list=PL1")).toBe("watch-video");
     expect(readYouTubeRouteVideoId("https://www.youtube.com/shorts/short-video?feature=share")).toBe("short-video");
     expect(readYouTubeRouteVideoId("https://www.youtube.com/results?search_query=test")).toBeNull();
+    expect(isYouTubeShortsRoute("https://www.youtube.com/shorts/short-video?feature=share")).toBe(true);
+    expect(isYouTubeShortsRoute("https://www.youtube.com/watch?v=watch-video")).toBe(false);
+    expect(isYouTubeWatchRoute("https://www.youtube.com/watch?v=watch-video")).toBe(true);
+    expect(isYouTubeWatchRoute("https://www.youtube.com/shorts/short-video")).toBe(false);
   });
 
   it("finds the Shorts player without requiring watch-page metadata", () => {
@@ -42,6 +49,7 @@ describe("YouTube translation control visibility", () => {
 
     expect(YOUTUBE_PAGE_SELECTOR.player).toContain("#shorts-player");
     expect(YOUTUBE_PAGE_SELECTOR.captionWindow).toBe(".ytp-caption-window-container");
+    expect(YOUTUBE_PAGE_SELECTOR.descriptionText).toBe("#description-inline-expander #expanded > yt-attributed-string");
     expect(YOUTUBE_PAGE_SELECTOR.commentsRoot).toContain("engagement-panel-comments-section");
     expect(findYouTubePageAnchors(documentNode)).toEqual({
       player,
@@ -50,6 +58,25 @@ describe("YouTube translation control visibility", () => {
       title: null,
       description: null,
     });
+  });
+
+  it("prefers the populated Shorts comments panel over an empty fallback root", () => {
+    const emptyRoot = {
+      matches: () => false,
+      querySelector: () => null,
+    } as unknown as HTMLElement;
+    const shortsRoot = {
+      matches: (selector: string) => selector === YOUTUBE_PAGE_SELECTOR.shortsCommentsRoot,
+      querySelector: (selector: string) => selector === YOUTUBE_PAGE_SELECTOR.comment ? {} : null,
+    } as unknown as HTMLElement;
+    const documentNode = {
+      querySelectorAll: (selector: string) => {
+        expect(selector).toBe(YOUTUBE_PAGE_SELECTOR.commentsRoot);
+        return [emptyRoot, shortsRoot];
+      },
+    } as unknown as Document;
+
+    expect(findCommentsRoot(documentNode)).toBe(shortsRoot);
   });
 
   it("shows the control when the native subtitle switch is enabled", () => {

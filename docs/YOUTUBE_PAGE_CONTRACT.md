@@ -110,8 +110,8 @@ interface TranscriptSegment {
 | 字幕层容器 | `.ytp-caption-window-container` | 捕获字幕那一瞬用注入样式临时隐藏以防原生字幕闪现，捕获后恢复；当观看页字幕叠加层激活时，再由 `body.xtranslator-captions-suppressed` 隐藏以“取代”原字幕。 |
 | 扩展字幕叠加层 | `#movie_player [data-xtranslator-mount="caption"]`、`#shorts-player [data-xtranslator-mount="caption"]` | 由内容脚本追加到播放器内；运行时按实际 `<video>` 的 viewport 矩形映射为播放器内绝对坐标，默认读取 `.ytp-progress-bar-container` 的实际边界，使字幕卡片底边位于进度条上方 8px。双语为译文在上（默认黄色）、原文在下，共享一个紧凑字幕卡片；用户可在播放器内上下拖动卡片，位置按播放器高度比例保存。Shorts 原文固定 15px、译文固定 19px，不使用普通视频字号缩放。 |
 | 设置按钮 | `.ytp-settings-button` | 不覆盖其事件或样式。 |
-| 标题 | `ytd-watch-metadata h1` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文。 |
-| 简介 | `#description-inline-expander` | 命名空间兄弟节点仅用于状态/错误提示，不渲染译文；不能改写原简介。 |
+| 标题 | `ytd-watch-metadata h1` | 仅普通视频观看页在标题下方挂载命名空间节点：保留原文，自动显示译文；失败时保留可点击重试入口。 |
+| 简介 | `#description-inline-expander #expanded > yt-attributed-string` | 仅当原生 `#collapse` 按钮可见时挂载。正文节点是 `#expanded` 的直接 `yt-attributed-string` 子元素；将带品牌标记的操作节点插入正文前方，只读取该节点文本，不改写原简介，也不读取“提问”“音乐”等模块。 |
 | 评论根节点 | `#comments`、`ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-comments-section"]` | 必须等待动态内容出现。播放器导航清理只移除播放器、标题、简介和字幕挂载点，不得移除评论挂载点。 |
 | 翻译可见评论批量控制 | 当前视口内第一个完整可见的顶级评论前 | 通过 `data-xtranslator-mount="comment-batch-control"` 唯一挂载；滚动或懒加载扫描时重新锚定，不调用 continuation API。 |
 

@@ -47,6 +47,7 @@ describe("extension messages", () => {
           apiKeys: {},
           providerModels: {},
           subtitles: { displayMode: "bilingual" },
+          page: { autoTranslateTitle: true },
           selection: { enabled: true, includeContext: false },
         },
         resolvedTargetLocale: "zh-Hans",
@@ -89,6 +90,24 @@ describe("extension messages", () => {
       segments: [{ id: "yt-abc", sourceText: "hello", startMs: 0, durationMs: 1000 }],
     };
     expect(parseExtensionMessage(valid)).toEqual(valid);
+    expect(parseExtensionMessage({
+      type: MESSAGE_TYPE.translateText,
+      scope: "title",
+      items: [{ id: "title-video", sourceText: "A video title" }],
+    })).toEqual({
+      type: MESSAGE_TYPE.translateText,
+      scope: "title",
+      items: [{ id: "title-video", sourceText: "A video title" }],
+    });
+    expect(parseExtensionMessage({
+      type: MESSAGE_TYPE.translateText,
+      scope: "description",
+      items: [{ id: "description-video", sourceText: "A video description" }],
+    })).toEqual({
+      type: MESSAGE_TYPE.translateText,
+      scope: "description",
+      items: [{ id: "description-video", sourceText: "A video description" }],
+    });
     expect(parseExtensionMessage({ ...valid, videoTitle: 1 })).toBeNull();
     expect(parseExtensionMessage({ ...valid, segments: [{ id: "yt-abc", sourceText: "x" }] })).toBeNull();
     expect(parseExtensionMessage({ type: MESSAGE_TYPE.translateVideo })).toBeNull();

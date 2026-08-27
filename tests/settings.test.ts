@@ -26,6 +26,7 @@ describe("provider settings", () => {
       apiKeys: { deepseek: "secret" },
       providerModels: { deepseek: "deepseek-chat" },
       subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
+      page: { autoTranslateTitle: true },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -42,6 +43,7 @@ describe("provider settings", () => {
       apiKeys: { deepseek: "  secret  " },
       providerModels: { deepseek: "deepseek-chat" },
       subtitles: { ...DEFAULT_SUBTITLE_SETTINGS },
+      page: { autoTranslateTitle: true },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -172,6 +174,30 @@ describe("subtitle settings", () => {
     expect(parseSubtitleSettings({ displayMode: "translation", verticalPosition: 2 })).toBeNull();
     expect(parseSubtitleSettings({ displayMode: "translation", shortsTranslationEnabled: "yes" })).toBeNull();
     expect(parseSubtitleSettings(null)).toBeNull();
+  });
+});
+
+describe("page translation settings", () => {
+  it("defaults title translation to enabled and migrates existing settings", () => {
+    expect(DEFAULT_SETTINGS.page).toEqual({ autoTranslateTitle: true });
+    expect(parseExtensionSettings({
+      provider: { providerId: "deepseek", model: "" },
+      apiKeys: {},
+      providerModels: {},
+      subtitles: { displayMode: "bilingual" },
+      selection: { enabled: true, includeContext: false },
+    })?.page).toEqual({ autoTranslateTitle: true });
+  });
+
+  it("rejects invalid title translation settings", () => {
+    expect(parseExtensionSettings({
+      provider: { providerId: "deepseek", model: "" },
+      apiKeys: {},
+      providerModels: {},
+      subtitles: { displayMode: "bilingual" },
+      page: { autoTranslateTitle: "yes" },
+      selection: { enabled: true, includeContext: false },
+    })).toBeNull();
   });
 });
 

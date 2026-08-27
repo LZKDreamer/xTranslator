@@ -34,8 +34,8 @@ import {
 } from "../shared/storage/video-translation-cache";
 import { shouldTranslateText } from "../shared/locale/translation-needed";
 import { t } from "../shared/i18n";
+import { MODEL_RESPONSE_RETRY, waitForModelResponseRetry } from "../shared/translation/model-response-retry";
 
-const MAX_TRANSLATION_ATTEMPTS = 2;
 const DEFAULT_TEMPERATURE = 0.1;
 const MIN_OUTPUT_TOKENS = 512;
 const OUTPUT_TOKENS_PER_SOURCE_TOKEN = 2.5;
@@ -348,7 +348,7 @@ export class VideoTranslationService {
 
     const result: TranslatedBlock[] = [];
 
-    for (let attempt = 0; attempt < MAX_TRANSLATION_ATTEMPTS && remaining.length > 0; attempt += 1) {
+    for (let attempt = 0; attempt < MODEL_RESPONSE_RETRY.maxAttempts && remaining.length > 0; attempt += 1) {
       const call = await this.callAdapter(remaining, context, maxOutputTokens, promptContext, onBlockProgress);
       if (call.abortedMessage) {
         return { blocks: result, missingIds: remaining.map((block) => block.id), abortedMessage: call.abortedMessage };
@@ -370,6 +370,9 @@ export class VideoTranslationService {
         if (matchedById.has(remaining[index]!.id)) {
           remaining.splice(index, 1);
         }
+      }
+      if (remaining.length > 0 && attempt < MODEL_RESPONSE_RETRY.maxAttempts - 1) {
+        await waitForModelResponseRetry(attempt + 1);
       }
     }
 

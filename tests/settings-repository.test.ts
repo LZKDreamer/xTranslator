@@ -29,6 +29,7 @@ describe("SettingsRepository", () => {
         originalFontScale: 100,
         verticalPosition: null,
       },
+      page: { autoTranslateTitle: true },
       selection: { enabled: true, includeContext: false },
     });
   });
@@ -48,6 +49,7 @@ describe("SettingsRepository", () => {
         originalFontScale: 90,
         verticalPosition: 0.25,
       },
+      page: { autoTranslateTitle: false },
       selection: { enabled: false, includeContext: true },
     });
     await expect(repository.loadSettings()).resolves.toEqual({
@@ -63,6 +65,7 @@ describe("SettingsRepository", () => {
         originalFontScale: 90,
         verticalPosition: 0.25,
       },
+      page: { autoTranslateTitle: false },
       selection: { enabled: false, includeContext: true },
     });
   });

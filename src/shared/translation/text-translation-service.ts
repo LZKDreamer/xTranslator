@@ -17,6 +17,7 @@ import { batchTextItems } from "./text-batch";
 import type { TextTranslationItem } from "./translation-types";
 import { shouldTranslateText } from "../locale/translation-needed";
 import { estimateTokens } from "./token-estimator";
+import { MODEL_RESPONSE_RETRY, waitForModelResponseRetry } from "./model-response-retry";
 
 const MAX_OUTPUT_FACTOR = 512;
 // Free-text requests are small (a viewport of comments or a selection). Do not
@@ -36,9 +37,7 @@ export interface TextTranslationContext {
   model: string;
   /** Read-only page context, used to disambiguate comment translations. */
   videoTitle?: string;
-  /** Retry only unmatched batch items in isolated requests. */
-  retryMissingItems?: boolean;
-  /** Limits simultaneous provider calls; comment batches use a small fixed pool. */
+  /** Limits simultaneous provider calls. */
   maxConcurrentBatches?: number;
 }
 
@@ -71,21 +70,14 @@ export class TextTranslationService {
     });
 
     const batchRuns = await this.translateBatches(batches, context, maxOutputTokens);
-    for (const { batch, run } of batchRuns) {
+    for (const { run } of batchRuns) {
       if (!run.ok) {
         return run;
       }
       for (const item of run.translations) {
         translations[item.id] = item.translatedText;
       }
-      const retryItems = context.retryMissingItems
-        ? batch.filter((item) => run.missingIds.includes(item.id))
-        : [];
-      const retried = await this.retryMissingItems(retryItems, context, maxOutputTokens);
-      for (const item of retried.translations) {
-        translations[item.id] = item.translatedText;
-      }
-      for (const id of [...run.missingIds.filter((id) => !translations[id]), ...retried.missingIds]) {
+      for (const id of run.missingIds) {
         if (translations[id] === undefined && !missingIds.includes(id)) {
           missingIds.push(id);
         }
@@ -105,32 +97,43 @@ export class TextTranslationService {
     context: TextTranslationContext,
     maxOutputTokens: number | undefined,
   ): Promise<TextBatchRun> {
-    const request = {
-      systemPrompt: buildTextSystemPrompt(context.targetLanguage),
-      userPrompt: buildTextUserPrompt(batch, { videoTitle: context.videoTitle }),
-    };
-    const options = {
-      model: context.model,
-      apiKey: context.apiKey,
-      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
-      temperature: DEFAULT_TEMPERATURE,
-    };
-    const completion = context.adapter.completeStream
-      ? await context.adapter.completeStream(request, options, () => undefined)
-      : await context.adapter.complete(request, options);
+    const remaining = [...batch];
+    const translations: { id: string; translatedText: string }[] = [];
 
-    if (!completion.ok) {
-      return { ok: false, errorMessage: userFacingProviderMessage(completion.error.reason) };
+    for (let attempt = 0; attempt < MODEL_RESPONSE_RETRY.maxAttempts && remaining.length > 0; attempt += 1) {
+      const request = {
+        systemPrompt: buildTextSystemPrompt(context.targetLanguage),
+        userPrompt: buildTextUserPrompt(remaining, { videoTitle: context.videoTitle }),
+      };
+      const options = {
+        model: context.model,
+        apiKey: context.apiKey,
+        ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+        temperature: DEFAULT_TEMPERATURE,
+      };
+      const completion = context.adapter.completeStream
+        ? await context.adapter.completeStream(request, options, () => undefined)
+        : await context.adapter.complete(request, options);
+
+      if (!completion.ok) {
+        return { ok: false, errorMessage: userFacingProviderMessage(completion.error.reason) };
+      }
+
+      const validated = this.validator.validate(remaining, completion.text);
+      const matched = validated.matched.filter((item) => item.translatedText.trim().length > 0);
+      const matchedIds = new Set(matched.map((item) => item.id));
+      translations.push(...matched);
+      for (let index = remaining.length - 1; index >= 0; index -= 1) {
+        if (matchedIds.has(remaining[index]!.id)) {
+          remaining.splice(index, 1);
+        }
+      }
+      if (remaining.length > 0 && attempt < MODEL_RESPONSE_RETRY.maxAttempts - 1) {
+        await waitForModelResponseRetry(attempt + 1);
+      }
     }
 
-    const validated = this.validator.validate(batch, completion.text);
-    const translations = validated.matched.filter((item) => item.translatedText.trim().length > 0);
-    const matchedIds = new Set(translations.map((item) => item.id));
-    return {
-      ok: true,
-      translations,
-      missingIds: [...new Set([...validated.missingIds, ...batch.filter((item) => !matchedIds.has(item.id)).map((item) => item.id)])],
-    };
+    return { ok: true, translations, missingIds: remaining.map((item) => item.id) };
   }
 
   private getMaxOutputTokens(context: TextTranslationContext, contextWindowTokens: number): number | undefined {
@@ -163,24 +166,4 @@ export class TextTranslationService {
     return results;
   }
 
-  private async retryMissingItems(
-    items: readonly TextTranslationItem[],
-    context: TextTranslationContext,
-    maxOutputTokens: number | undefined,
-  ): Promise<{ translations: { id: string; translatedText: string }[]; missingIds: string[] }> {
-    const translations: { id: string; translatedText: string }[] = [];
-    const missingIds: string[] = [];
-    for (const item of items) {
-      const retry = await this.translateBatch([item], context, maxOutputTokens);
-      if (!retry.ok) {
-        missingIds.push(item.id);
-        continue;
-      }
-      translations.push(...retry.translations);
-      if (retry.missingIds.includes(item.id)) {
-        missingIds.push(item.id);
-      }
-    }
-    return { translations, missingIds };
-  }
 }
