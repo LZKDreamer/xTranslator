@@ -55,7 +55,7 @@ pnpm build
 
 ### 安装发布包
 
-下载与安装包版本对应的 `xTranslator-版本号.zip`，解压后按上面的“在 Chrome 中加载”步骤选择解压目录。扩展弹窗会通过 jsDelivr 检查更新；发现新版本时会提供对应 zip 的下载链接。下载并解压新版后，在 `chrome://extensions` 中重新加载该目录即可完成更新。
+下载与安装包版本对应的 `xTranslator-版本号.zip`，解压后按上面的“在 Chrome 中加载”步骤选择解压目录。扩展弹窗或设置页会通过 jsDelivr 检查更新；发现新版本时会提供对应 zip 的下载链接。下载并解压新版后，在 `chrome://extensions` 中重新加载该目录即可完成更新。
 
 ### 发布新版本
 
@@ -65,7 +65,7 @@ pnpm build
 pnpm release -- 0.1.2
 ```
 
-发布脚本会同步版本号、构建扩展、生成安装包、更新 jsDelivr 所需的更新清单、创建提交与 tag、推送到 GitHub，并验证 CDN 下载链接。GitHub Release 不参与该流程。完整规则见 [发布流程](docs/RELEASE_WORKFLOW.md)。
+发布脚本会同步版本号、构建扩展、生成安装包、更新并刷新 jsDelivr 更新清单、创建提交与 tag、推送到 GitHub，并验证安装包和更新清单。GitHub Release 不参与该流程。完整规则见 [发布流程](docs/RELEASE_WORKFLOW.md)。
 
 ## 支持的翻译服务
 
