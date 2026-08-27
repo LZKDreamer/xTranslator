@@ -20,6 +20,7 @@ import { t } from "../shared/i18n";
 
 export const CAPTION_SUPPRESSED_CLASS = "xtranslator-captions-suppressed";
 export const CAPTION_PROGRESS_GAP_PX = 8;
+export const CAPTION_FALLBACK_BOTTOM_OFFSET_PX = 68;
 
 interface VerticalRect {
   top: number;
@@ -72,6 +73,11 @@ export function getCaptionBottomOffset(
     return null;
   }
   return Math.max(0, playerRect.bottom - progressBarRect.top + gapPx);
+}
+
+/** Keep manually placed captions above the player controls as well. */
+export function getCaptionMaximumTop(availableHeight: number, bottomOffset: number): number {
+  return Math.max(0, availableHeight - bottomOffset);
 }
 
 export interface TimedBlock {
@@ -127,6 +133,7 @@ export class CaptionOverlayController {
   private subtitleSettings: SubtitleSettings = { ...DEFAULT_SUBTITLE_SETTINGS };
   private nativeCaptionObserver: MutationObserver | null = null;
   private renderedBlockId: string | null = null;
+  private captionBottomOffset = CAPTION_FALLBACK_BOTTOM_OFFSET_PX;
 
   public constructor(
     private readonly documentNode: Document,
@@ -277,7 +284,8 @@ export class CaptionOverlayController {
     const bottomOffset = progressBar
       ? getCaptionBottomOffset(rect, progressBar.getBoundingClientRect())
       : null;
-    this.overlay.style.setProperty("--xtranslator-caption-bottom", bottomOffset === null ? "" : `${bottomOffset}px`);
+    this.captionBottomOffset = bottomOffset ?? CAPTION_FALLBACK_BOTTOM_OFFSET_PX;
+    this.overlay.style.setProperty("--xtranslator-caption-bottom", `${this.captionBottomOffset}px`);
     this.positionCard();
   }
 
@@ -391,7 +399,7 @@ export class CaptionOverlayController {
     }
     const availableHeight = Math.max(0, this.overlay.clientHeight - card.offsetHeight);
     card.dataset.position = "manual";
-    card.style.top = `${Math.round(position * availableHeight)}px`;
+    card.style.top = `${Math.round(Math.min(position * availableHeight, getCaptionMaximumTop(availableHeight, this.captionBottomOffset)))}px`;
   }
 
   private bindCardDrag(card: HTMLDivElement): void {
@@ -403,6 +411,7 @@ export class CaptionOverlayController {
       const overlayRect = this.overlay.getBoundingClientRect();
       const cardRect = card.getBoundingClientRect();
       const availableHeight = Math.max(0, overlayRect.height - cardRect.height);
+      const maximumTop = getCaptionMaximumTop(availableHeight, this.captionBottomOffset);
       const startTop = Math.max(0, Math.min(availableHeight, cardRect.top - overlayRect.top));
       const startY = event.clientY;
       card.setPointerCapture(event.pointerId);
@@ -412,7 +421,7 @@ export class CaptionOverlayController {
         if (moveEvent.pointerId !== event.pointerId) {
           return;
         }
-        const nextTop = Math.max(0, Math.min(availableHeight, startTop + moveEvent.clientY - startY));
+        const nextTop = Math.max(0, Math.min(maximumTop, startTop + moveEvent.clientY - startY));
         this.subtitleSettings = {
           ...this.subtitleSettings,
           verticalPosition: availableHeight === 0 ? 0 : nextTop / availableHeight,

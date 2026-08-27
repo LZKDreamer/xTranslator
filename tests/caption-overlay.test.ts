@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCaptionBottomOffset, getCaptionOverlayGeometry, toTimedBlocks } from "../src/content/caption-overlay";
+import { getCaptionBottomOffset, getCaptionMaximumTop, getCaptionOverlayGeometry, toTimedBlocks } from "../src/content/caption-overlay";
 import type { TranslatedBlock } from "../src/shared/translation/translation-types";
 
 function block(id: string, startMs: number, endMs: number): TranslatedBlock {
@@ -39,6 +39,11 @@ describe("caption progress-bar placement", () => {
       { top: 100, bottom: 500, height: 400 },
       { top: 510, bottom: 520, height: 10 },
     )).toBeNull();
+  });
+
+  it("also keeps a manually positioned subtitle above the progress bar", () => {
+    expect(getCaptionMaximumTop(360, 48)).toBe(312);
+    expect(getCaptionMaximumTop(40, 68)).toBe(0);
   });
 });
 
