@@ -19,7 +19,8 @@ $updatePath = Join-Path $updateDirectory "latest.json"
 $downloadUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@v$version/releases/$archiveName"
 
 New-Item -ItemType Directory -Force -Path $releaseDirectory, $updateDirectory | Out-Null
-@{ version = $version; downloadUrl = $downloadUrl } | ConvertTo-Json | Set-Content -Path $updatePath -Encoding utf8
+$utf8NoBom = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
+[System.IO.File]::WriteAllText($updatePath, (@{ version = $version; downloadUrl = $downloadUrl } | ConvertTo-Json), $utf8NoBom)
 
 Push-Location $projectDirectory
 try {

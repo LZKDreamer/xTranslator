@@ -32,7 +32,8 @@ function Set-JsonVersion([string]$Path, [string]$NewVersion) {
   }
 
   $updated = [regex]::Replace($content, '"version"\s*:\s*"[^"]+"', "`"version`": `"$NewVersion`"", 1)
-  Set-Content -Path $Path -Value $updated -Encoding utf8
+  $utf8NoBom = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList $false
+  [System.IO.File]::WriteAllText($Path, $updated, $utf8NoBom)
 }
 
 if (-not (Test-ChromeExtensionVersion $Version)) {
@@ -46,6 +47,8 @@ $updatePath = Join-Path $projectDirectory "public/updates/latest.json"
 $tag = "v$Version"
 $archivePath = Join-Path $projectDirectory "releases/xTranslator-$Version.zip"
 $cdnUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@$tag/releases/xTranslator-$Version.zip"
+$updateManifestUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json"
+$purgeUrl = "https://purge.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json"
 
 Push-Location $projectDirectory
 try {
@@ -88,7 +91,7 @@ try {
 
   $available = $false
   for ($attempt = 1; $attempt -le 3; $attempt += 1) {
-    $status = & curl.exe -sS -L -o NUL -w "%{http_code}" $cdnUrl
+    $status = & curl.exe -sS -L --fail -o NUL -w "%{http_code}" $cdnUrl
     if ($status -eq "200") {
       $available = $true
       break
@@ -101,8 +104,36 @@ try {
     throw "GitHub received $tag, but jsDelivr has not made the archive available yet: $cdnUrl"
   }
 
+  & curl.exe -sS -L --fail $purgeUrl | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "The release archive is available, but jsDelivr update-manifest purge failed: $purgeUrl"
+  }
+
+  $manifestAvailable = $false
+  for ($attempt = 1; $attempt -le 18; $attempt += 1) {
+    $remoteManifestJson = & curl.exe -sS -L --fail $updateManifestUrl
+    if ($LASTEXITCODE -eq 0) {
+      try {
+        $remoteManifest = $remoteManifestJson | ConvertFrom-Json
+        if ($remoteManifest.version -eq $Version -and $remoteManifest.downloadUrl -eq $cdnUrl) {
+          $manifestAvailable = $true
+          break
+        }
+      } catch {
+        # Keep polling until jsDelivr serves a complete JSON manifest.
+      }
+    }
+
+    Start-Sleep -Seconds 10
+  }
+
+  if (-not $manifestAvailable) {
+    throw "GitHub received $tag and the archive is available, but jsDelivr is still serving an outdated update manifest: $updateManifestUrl"
+  }
+
   Write-Host "Published $tag"
   Write-Host "Download: $cdnUrl"
+  Write-Host "Update manifest: $updateManifestUrl"
 } finally {
   Pop-Location
 }

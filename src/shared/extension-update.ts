@@ -1,4 +1,4 @@
-export const UPDATE_MANIFEST_URL = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@main/public/updates/latest.json";
+export const UPDATE_MANIFEST_URL = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json";
 
 export interface ExtensionUpdate {
   version: string;

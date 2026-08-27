@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("extension update", () => {
   it("loads the mutable update manifest through jsDelivr", () => {
-    expect(UPDATE_MANIFEST_URL).toBe("https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@main/public/updates/latest.json");
+    expect(UPDATE_MANIFEST_URL).toBe("https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json");
   });
 
   it("compares Chrome extension versions", () => {
