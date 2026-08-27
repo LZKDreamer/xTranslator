@@ -49,6 +49,8 @@ $archivePath = Join-Path $projectDirectory "releases/xTranslator-$Version.zip"
 $cdnUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@$tag/releases/xTranslator-$Version.zip"
 $updateManifestUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json"
 $purgeUrl = "https://purge.jsdelivr.net/gh/LZKDreamer/xTranslator@latest/public/updates/latest.json"
+$legacyUpdateManifestUrl = "https://cdn.jsdelivr.net/gh/LZKDreamer/xTranslator@main/public/updates/latest.json"
+$legacyPurgeUrl = "https://purge.jsdelivr.net/gh/LZKDreamer/xTranslator@main/public/updates/latest.json"
 
 Push-Location $projectDirectory
 try {
@@ -104,31 +106,46 @@ try {
     throw "GitHub received $tag, but jsDelivr has not made the archive available yet: $cdnUrl"
   }
 
-  & curl.exe -sS -L --fail $purgeUrl | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    throw "The release archive is available, but jsDelivr update-manifest purge failed: $purgeUrl"
+  foreach ($purgeTarget in @($purgeUrl, $legacyPurgeUrl)) {
+    & curl.exe -sS -L --fail $purgeTarget | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      throw "The release archive is available, but jsDelivr update-manifest purge failed: $purgeTarget"
+    }
   }
 
   $manifestAvailable = $false
+  $manifestUrls = @($updateManifestUrl, $legacyUpdateManifestUrl)
   for ($attempt = 1; $attempt -le 18; $attempt += 1) {
-    $remoteManifestJson = & curl.exe -sS -L --fail $updateManifestUrl
-    if ($LASTEXITCODE -eq 0) {
+    $allManifestsAvailable = $true
+    foreach ($manifestUrl in $manifestUrls) {
+      $remoteManifestJson = & curl.exe -sS -L --fail $manifestUrl
+      if ($LASTEXITCODE -ne 0) {
+        $allManifestsAvailable = $false
+        break
+      }
+
       try {
         $remoteManifest = $remoteManifestJson | ConvertFrom-Json
-        if ($remoteManifest.version -eq $Version -and $remoteManifest.downloadUrl -eq $cdnUrl) {
-          $manifestAvailable = $true
+        if ($remoteManifest.version -ne $Version -or $remoteManifest.downloadUrl -ne $cdnUrl) {
+          $allManifestsAvailable = $false
           break
         }
       } catch {
-        # Keep polling until jsDelivr serves a complete JSON manifest.
+        $allManifestsAvailable = $false
+        break
       }
+    }
+
+    if ($allManifestsAvailable) {
+      $manifestAvailable = $true
+      break
     }
 
     Start-Sleep -Seconds 10
   }
 
   if (-not $manifestAvailable) {
-    throw "GitHub received $tag and the archive is available, but jsDelivr is still serving an outdated update manifest: $updateManifestUrl"
+    throw "GitHub received $tag and the archive is available, but jsDelivr is still serving an outdated update manifest: $updateManifestUrl or $legacyUpdateManifestUrl"
   }
 
   Write-Host "Published $tag"
