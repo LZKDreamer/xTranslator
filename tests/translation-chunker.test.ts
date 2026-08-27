@@ -98,6 +98,7 @@ describe("buildTranslationBlocks", () => {
     expect(cleanCaptionText("[音楽]")).toBe("");
     expect(cleanCaptionText("[咳払い]")).toBe("");
     expect(cleanCaptionText("[snorts]")).toBe("");
+    expect(cleanCaptionText("বাংলা موسيقى কথা")).toBe("বাংলা কথা");
     expect(cleanCaptionText("…")).toBe("");
     expect(cleanTranslatedCaptionText("这是 Google 的产品。", "zh-Hans")).toBe("这是 Google 的产品。");
     expect(cleanTranslatedCaptionText("What's new?", "en")).toBe("What's new?");
@@ -178,12 +179,13 @@ describe("buildTranslationBlocks", () => {
     const segments = Array.from({ length: 17 }, (_, index) => segment(String(index), "word", index * 1000));
     const blocks = buildTranslationBlocks(segments, computeInputTokenBudget(65_536));
 
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 16000 });
-    expect(blocks[1]).toMatchObject({ startMs: 16000, endMs: 17000 });
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 8000 });
+    expect(blocks[1]).toMatchObject({ startMs: 8000, endMs: 16000 });
+    expect(blocks[2]).toMatchObject({ startMs: 16000, endMs: 17000 });
   });
 
-  it("uses the next JSON3 cue as the grouping end when raw durations overlap", () => {
+  it("uses the next JSON3 cue as the grouping end and respects the display duration cap", () => {
     const blocks = buildTranslationBlocks(
       [
         segment("a", "昨夜羽田空港", 0, 8000),
@@ -193,8 +195,9 @@ describe("buildTranslationBlocks", () => {
       computeInputTokenBudget(65_536),
     );
 
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 10000, segmentIds: ["a", "b", "c"] });
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toMatchObject({ startMs: 0, endMs: 8000, segmentIds: ["a", "b"] });
+    expect(blocks[1]).toMatchObject({ startMs: 8000, endMs: 10000, segmentIds: ["c"] });
   });
 
   it("keeps ordinary English caption blocks within the two-line source budget", () => {

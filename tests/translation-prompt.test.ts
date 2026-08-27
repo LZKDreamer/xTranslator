@@ -38,7 +38,7 @@ describe("translation prompt", () => {
     expect(user.indexOf("1.")).toBeLessThan(user.indexOf("2."));
   });
 
-  it("includes video metadata without including neighboring caption text", () => {
+  it("includes video metadata while keeping ordered blocks available as context", () => {
     const user = buildUserPrompt([blocks[0]!], { title: "Video title" });
     expect(user).toContain('title "Video title"');
     expect(user).not.toContain("description");
@@ -46,10 +46,11 @@ describe("translation prompt", () => {
     expect(user).not.toContain("context-after");
   });
 
-  it("forbids the model from changing timing or borrowing adjacent content", () => {
+  it("allows contextual correction without allowing content or timing to cross block boundaries", () => {
     const system = buildSystemPrompt("en", "zh-Hans");
     expect(system).toContain("Do not return, infer or modify timestamps");
-    expect(system).toContain("Do not complete it with neighboring blocks");
-    expect(system).toContain("preserve that incomplete ending");
+    expect(system).toContain("Use nearby blocks and the title only as context");
+    expect(system).toContain("never copy, repeat, move or merge their content across block IDs");
+    expect(system).toContain("strongly supported by the supplied blocks or title");
   });
 });

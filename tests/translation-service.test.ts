@@ -409,6 +409,7 @@ describe("VideoTranslationService", () => {
         buildTranslationBlocks(gappedSegments, getProviderContextWindow(preset, "test-model")).map((block) => block.id),
       );
       expect(result.blocks.map((block) => block.segmentIds)).toEqual([["yt-aa"], ["yt-bb"]]);
+      expect(result.blocks.map((block) => [block.startMs, block.endMs])).toEqual([[0, 1000], [2000, 3000]]);
       expect(result.blocks.every((block) => block.translatedText.startsWith("译文"))).toBe(true);
     }
   });

@@ -108,7 +108,14 @@ describe("VideoTranslationRepository", () => {
     expect(entries[0]?.videoTitle).toBe("Title video-1");
   });
 
-  it("uses only the video id as the cache key", () => {
-    expect(buildVideoCacheKey({ videoId: "v1" })).toBe("v1");
+  it("versions the cache key so older subtitle processing results are not reused", () => {
+    expect(buildVideoCacheKey({ videoId: "v1" })).toBe("caption-v2::v1");
+  });
+
+  it("does not read a legacy unversioned subtitle cache entry", async () => {
+    const repo = new VideoTranslationRepository(openExtensionDatabase);
+    await repo.put(createEntry("video-1", "video-1", [createBlock("blk-aa", "旧译文")]));
+
+    expect(await repo.get(buildVideoCacheKey({ videoId: "video-1" }))).toBeNull();
   });
 });

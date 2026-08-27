@@ -30,7 +30,7 @@ import { cleanCaptionText, containsSpokenContent, splitCaptionSegment } from "./
 import type { TranslationBlockInput, TranslationSourceSegment } from "./translation-types";
 
 const DEFAULT_GAP_MS = 500;
-const MAX_BLOCK_DURATION_MS = 16_000;
+const MAX_BLOCK_DURATION_MS = 8_000;
 
 // A block should fit into a compact two-line subtitle. The token estimate is
 // language-aware (CJK ≈ 1 token/char, Latin ≈ 1/4 token/char), so the larger

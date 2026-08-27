@@ -27,11 +27,12 @@ export interface VideoTranslationCache {
 }
 
 const utf8Encoder = new TextEncoder();
+const VIDEO_TRANSLATION_CACHE_VERSION = "caption-v2";
 
 export function buildVideoCacheKey(params: {
   videoId: string;
 }): string {
-  return params.videoId;
+  return `${VIDEO_TRANSLATION_CACHE_VERSION}::${params.videoId}`;
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {

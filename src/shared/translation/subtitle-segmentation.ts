@@ -1,10 +1,11 @@
 import type { TranslationSourceSegment } from "./translation-types";
 
-const CAPTION_MARKER_WORDS = /^(?:music|song|applause|laugh(?:s|ter)?|laughter|sigh(?:s|ing)?|cry(?:ing)?|breath(?:ing)?|noise|sound effects?|inaudible|indistinct|unintelligible|speaking (?:foreign )?language|cheering|crowd|clapping|door|phone ringing|snorts?|cough(?:s|ing)?|sneez(?:e|ing)|musik|música|musica|musique|tepuk tangan|lonceng|musik bermain|音楽|拍手|笑い|咳払い|咳|鈴|鐘|音效|音乐|掌声|笑声|叹气|哭声|呼吸声|噪音|听不清|无法辨认|음악|박수|웃음|기침|숨소리)(?:\s+(?:playing|plays|sounds?|only|continues|再生中|중))?$/iu;
+const CAPTION_MARKER_WORDS = /^(?:music|song|applause|laugh(?:s|ter)?|laughter|sigh(?:s|ing)?|cry(?:ing)?|breath(?:ing)?|noise|sound effects?|inaudible|indistinct|unintelligible|speaking (?:foreign )?language|cheering|crowd|clapping|door|phone ringing|snorts?|cough(?:s|ing)?|sneez(?:e|ing)|musik|música|musica|musique|tepuk tangan|lonceng|musik bermain|موسيقى|音楽|拍手|笑い|咳払い|咳|鈴|鐘|音效|音乐|掌声|笑声|叹气|哭声|呼吸声|噪音|听不清|无法辨认|음악|박수|웃음|기침|숨소리)(?:\s+(?:playing|plays|sounds?|only|continues|再生中|중))?$/iu;
 const CAPTION_MARKER_SYMBOLS = /^(?:[♪♫]+|[-–—_*]+)$/u;
 const SPEAKER_PREFIX = /^\s*>>\s*/gmu;
 const SENTENCE_BOUNDARY = /[.!?。！？…]+["'”’」』）)\]}]*/gu;
 const CJK_CHARACTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const BENGALI_INLINE_ARABIC_MUSIC_MARKER = /(\p{Script=Bengali}[\p{Script=Bengali}\s]*)\s+موسيقى(?=\s*\p{Script=Bengali})/gu;
 
 function isCaptionMarker(value: string): boolean {
   const normalized = value.replace(/\s+/gu, " ").trim();
@@ -18,6 +19,10 @@ export function cleanCaptionText(text: string): string {
     .replace(/\u200B|\uFEFF/gu, "")
     .replace(SPEAKER_PREFIX, " ")
     .replace(/♪|♫/gu, " ")
+    // YouTube ASR can insert this Arabic music marker into Bengali speech without
+    // brackets. Limit the cleanup to the mixed-script pattern to keep spoken
+    // Arabic text intact.
+    .replace(BENGALI_INLINE_ARABIC_MUSIC_MARKER, "$1")
     .replace(/\[([^\]]*)\]/gu, (_match, inner: string) => (isCaptionMarker(inner) ? " " : ` ${inner} `))
     .replace(/\(([^()]*)\)/gu, (_match, inner: string) => (isCaptionMarker(inner) ? " " : ` (${inner}) `))
     .replace(/\{([^{}]*)\}/gu, (_match, inner: string) => {
