@@ -18,14 +18,16 @@
           <i data-lucide="settings" aria-hidden="true"></i>
         </button>
       </header>
-      <section id="locale-panel" class="config-panel" aria-live="polite" data-state="ready">
-        <p class="eyebrow" data-i18n="popup.translationLanguage">Translation language</p>
-        <p id="locale-detail" class="config-detail" data-i18n="popup.followBrowserLanguage">Follow browser language</p>
-      </section>
-      <section id="config-panel" class="config-panel" aria-live="polite" data-state="idle">
-        <p class="eyebrow" data-i18n="popup.translationEngine">Translation engine</p>
-        <p id="config-detail" class="config-detail" data-i18n="popup.loading">Loading…</p>
-      </section>
+      <div class="configuration-summary">
+        <section id="locale-panel" class="config-panel" aria-live="polite" data-state="ready">
+          <p class="eyebrow" data-i18n="popup.translationLanguage">Translation language</p>
+          <p id="locale-detail" class="config-detail" data-i18n="popup.followBrowserLanguage">Follow browser language</p>
+        </section>
+        <section id="config-panel" class="config-panel" aria-live="polite" data-state="idle">
+          <p class="eyebrow" data-i18n="popup.translationEngine">Translation engine</p>
+          <p id="config-detail" class="config-detail" data-i18n="popup.loading">Loading…</p>
+        </section>
+      </div>
       <section id="update-panel" class="config-panel" role="alert" hidden>
         <p class="eyebrow" data-i18n="popup.updateAvailable">Update available</p>
         <p id="update-detail" class="config-detail"></p>

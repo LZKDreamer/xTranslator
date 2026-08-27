@@ -53,10 +53,11 @@ button {
   justify-content: space-between;
   box-sizing: border-box;
   padding: var(--space-8) var(--space-12);
-  margin-bottom: var(--space-16);
+  min-height: 56px;
+  margin-bottom: var(--space-12);
   border: var(--border-glass-light);
   border-radius: var(--radius-panel);
-  background: var(--surface-glass-light);
+  background: var(--surface-glass-light-strong);
   box-shadow: var(--shadow-light), var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
@@ -85,9 +86,9 @@ button {
   height: var(--size-icon-button);
   padding: 0;
   color: var(--color-text-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.56);
-  border-radius: var(--radius-control);
-  background: var(--surface-glass-light);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.32);
   box-shadow: var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
@@ -99,7 +100,8 @@ button {
 .icon-button:hover,
 .icon-button:focus-visible {
   color: var(--color-accent-violet);
-  background: var(--surface-glass-light-strong);
+  border-color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.7);
   box-shadow: var(--shadow-glass-inset), 0 6px 16px rgba(72, 86, 145, 0.12);
 }
 
@@ -108,18 +110,39 @@ button {
   outline-offset: var(--focus-outline-offset);
 }
 
-.config-panel {
-  padding: var(--space-12);
+.configuration-summary {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
   border: var(--border-glass-light);
-  border-radius: var(--radius-control);
-  background: var(--surface-glass-light);
+  border-radius: var(--radius-panel);
+  background: rgba(106, 122, 171, 0.13);
   box-shadow: var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
 }
 
-.config-panel + .config-panel {
+.config-panel {
+  padding: var(--space-12);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.configuration-summary .config-panel:first-child {
+  border-radius: 15px 15px 5px 5px;
+}
+
+.configuration-summary .config-panel:last-child {
+  border-radius: 5px 5px 15px 15px;
+}
+
+#update-panel {
   margin-top: var(--space-12);
+  border: var(--border-glass-light);
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--shadow-glass-inset);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
 }
 
 .config-detail {
@@ -149,8 +172,8 @@ button {
   margin-top: var(--space-12);
   padding: var(--space-12);
   border: var(--border-glass-light);
-  border-radius: var(--radius-control);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.56), rgba(120, 101, 255, 0.12));
+  border-radius: var(--radius-panel);
+  background: rgba(255, 255, 255, 0.76);
   box-shadow: var(--shadow-light), var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
@@ -174,7 +197,7 @@ button {
 }
 
 .translation-title {
-  margin-top: var(--space-2);
+  margin-top: 4px;
   overflow: hidden;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
@@ -184,7 +207,7 @@ button {
 }
 
 .translation-detail {
-  margin-top: var(--space-2);
+  margin-top: 4px;
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);

@@ -9,10 +9,11 @@ const CONTENT_STYLE = `
      the visible toolbar is the positioned parent below. Pin our child within
      that toolbar instead of letting its flex layout push it over fullscreen. */
   #shorts-player .ytp-chrome-top-buttons > [data-xtranslator-mount="player"] { position: absolute; top: 0; right: 160px; z-index: 1; display: flex; flex: 0 0 44px; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; margin: 0; background: transparent; }
-  .xtranslator-control { display: grid; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; box-shadow: none; place-items: center; cursor: pointer; }
+  .xtranslator-control { display: grid; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid transparent; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; box-shadow: none; place-items: center; cursor: pointer; transition: background ${DESIGN_TOKEN.duration.fast}, border-color ${DESIGN_TOKEN.duration.fast}, transform ${DESIGN_TOKEN.duration.fast}; }
   .xtranslator-control svg { display: block; width: 18px; height: 18px; }
   .xtranslator-brand-mark { display: block; object-fit: contain; }
   .xtranslator-control .xtranslator-brand-mark { display: block !important; visibility: visible !important; width: 20px; height: 20px; border-radius: 6px; opacity: 1 !important; }
+  .xtranslator-control:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.14); transform: translateY(-1px); }
   .xtranslator-control:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 2px; }
   .xtranslator-control:disabled { cursor: progress; opacity: .72; }
   .xtranslator-status { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; display: flex; align-items: center; gap: 6px; max-width: 320px; padding: 8px 12px; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid ${DESIGN_TOKEN.color.borderGlassDark}; border-radius: ${DESIGN_TOKEN.radius.control}; background: ${DESIGN_TOKEN.color.surfaceGlassDark}; box-shadow: ${DESIGN_TOKEN.shadow.float}; backdrop-filter: blur(${DESIGN_TOKEN.blur.glass}); font: 13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -24,16 +25,16 @@ const CONTENT_STYLE = `
   .xtranslator-title-translation[data-state="loading"] { opacity: .78; }
   .xtranslator-title-translation[data-state="error"] { color: ${DESIGN_TOKEN.color.danger}; }
   .xtranslator-title-translation[data-state="failed"] { display: flex; align-items: center; gap: 8px; color: ${DESIGN_TOKEN.color.danger}; }
-  .xtranslator-title-retry { min-height: 26px; padding: 0 9px; color: inherit; border: 1px solid currentColor; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-title-retry { min-height: 32px; padding: 0 10px; color: inherit; border: 1px solid currentColor; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
   .xtranslator-title-retry:hover { background: rgba(214, 48, 49, .08); }
   .xtranslator-title-retry:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
   .xtranslator-description-translation { margin: 12px 0 4px; }
-  .xtranslator-description-action { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 11px 0 8px; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid ${DESIGN_TOKEN.color.borderGlassDark}; border-radius: 999px; background: linear-gradient(135deg, ${DESIGN_TOKEN.color.surfaceGlassDarkStrong}, ${DESIGN_TOKEN.color.accentViolet}); box-shadow: 0 3px 10px rgba(25, 35, 69, .22); cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-description-action { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px 0 8px; color: ${DESIGN_TOKEN.color.textOnDark}; border: 1px solid ${DESIGN_TOKEN.color.borderGlassDark}; border-radius: 999px; background: ${DESIGN_TOKEN.color.surfaceGlassDark}; box-shadow: 0 3px 10px rgba(25, 35, 69, .22); cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; transition: background ${DESIGN_TOKEN.duration.fast}, box-shadow ${DESIGN_TOKEN.duration.fast}, transform ${DESIGN_TOKEN.duration.fast}; }
   .xtranslator-description-action .xtranslator-brand-mark { width: 16px; height: 16px; flex: none; border-radius: 5px; }
   .xtranslator-description-action:hover { box-shadow: 0 5px 14px rgba(25, 35, 69, .28); transform: translateY(-1px); }
   .xtranslator-description-action:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
   .xtranslator-description-action:disabled { cursor: progress; opacity: .72; }
-  .xtranslator-description-result { margin-top: 8px; padding: 8px 10px; color: ${DESIGN_TOKEN.color.textPrimary}; border-left: 3px solid ${DESIGN_TOKEN.color.accentViolet}; border-radius: 6px; background: ${DESIGN_TOKEN.color.surfaceGlassLight}; font: 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space: pre-wrap; }
+  .xtranslator-description-result { margin-top: 8px; padding: 9px 12px; color: ${DESIGN_TOKEN.color.textPrimary}; border: 1px solid rgba(91, 108, 153, .16); border-left: 3px solid ${DESIGN_TOKEN.color.accentViolet}; border-radius: 8px; background: ${DESIGN_TOKEN.color.surfaceGlassLightStrong}; font: 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space: pre-wrap; }
   .xtranslator-description-translation[data-state="failed"] .xtranslator-description-result { color: ${DESIGN_TOKEN.color.danger}; border-left-color: ${DESIGN_TOKEN.color.danger}; }
   .xtranslator-caption { position: absolute; inset: auto; box-sizing: border-box; z-index: 10000; padding: 0 2%; pointer-events: none; text-align: center; }
   .xtranslator-caption[hidden] { display: none; }
@@ -51,19 +52,21 @@ const CONTENT_STYLE = `
   .${XTRANSLATOR_DOM.nativeCaptionSuppressedClass} { visibility: hidden !important; }
   .xtranslator-comments-control { display: flex; align-items: center; margin: 12px 0 4px; }
   .xtranslator-comment-controls { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-  .xtranslator-comment-action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; color: ${DESIGN_TOKEN.color.textPrimary}; border: ${DESIGN_TOKEN.color.borderGlassLight}; border-radius: ${DESIGN_TOKEN.radius.control}; background: ${DESIGN_TOKEN.color.surfaceGlassLight}; cursor: pointer; font: 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; pointer-events: auto; }
+  .xtranslator-comment-action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 11px; color: ${DESIGN_TOKEN.color.textPrimary}; border: 1px solid rgba(86, 102, 148, .18); border-radius: ${DESIGN_TOKEN.radius.control}; background: ${DESIGN_TOKEN.color.surfaceGlassLightStrong}; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .78); cursor: pointer; font: 600 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; pointer-events: auto; transition: background ${DESIGN_TOKEN.duration.fast}, box-shadow ${DESIGN_TOKEN.duration.fast}, transform ${DESIGN_TOKEN.duration.fast}; }
   /* The batch action is moved beside the first visible top-level comment by the
      controller. It must stay in normal flow: sticky positioning flickers when
      YouTube reflows or virtualizes the last comment container. */
   [data-xtranslator-mount="comment-batch-control"] { position: relative; z-index: 2; }
+  [data-xtranslator-mount="comment-batch-control"].xtranslator-comment-action { color: ${DESIGN_TOKEN.color.textOnDark}; border-color: rgba(255, 255, 255, .32); background: ${DESIGN_TOKEN.color.accentViolet}; box-shadow: 0 4px 12px rgba(60, 55, 142, .2); }
   .xtranslator-comment-action > * { pointer-events: none; }
   .xtranslator-comment-action svg { width: 12px; height: 12px; flex: none; }
   .xtranslator-comment-action .xtranslator-brand-mark { width: 16px; height: 16px; flex: none; border-radius: 5px; }
-  .xtranslator-comment-action:hover { background: ${DESIGN_TOKEN.color.surfaceGlassLightStrong}; }
+  .xtranslator-comment-action:hover { background: rgba(255, 255, 255, .96); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .88), 0 3px 10px rgba(41, 52, 84, .12); transform: translateY(-1px); }
+  [data-xtranslator-mount="comment-batch-control"].xtranslator-comment-action:hover { background: #6955ed; }
   .xtranslator-comment-action:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
   .xtranslator-comment-action[data-state="loading"] { cursor: progress; opacity: .72; }
   .xtranslator-comment-action[data-state="error"] { color: ${DESIGN_TOKEN.color.danger}; }
-  .xtranslator-comment-translation { box-sizing: border-box; max-width: 100%; margin-top: 4px; padding: 6px 10px; color: ${DESIGN_TOKEN.color.textPrimary}; border-left: 3px solid ${DESIGN_TOKEN.color.accentViolet}; border-radius: 6px; background: ${DESIGN_TOKEN.color.surfaceGlassLight}; font: 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .xtranslator-comment-translation { box-sizing: border-box; max-width: 100%; margin-top: 6px; padding: 8px 12px; color: ${DESIGN_TOKEN.color.textPrimary}; border: 1px solid rgba(86, 102, 148, .14); border-left: 3px solid ${DESIGN_TOKEN.color.accentViolet}; border-radius: 8px; background: ${DESIGN_TOKEN.color.surfaceGlassLightStrong}; font: 13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
   .xtranslator-comment-retry { padding: 0; color: inherit; border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
   .xtranslator-comment-retry:hover { text-decoration: underline; }
   .xtranslator-comment-retry:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 2px; border-radius: 3px; }
@@ -76,7 +79,7 @@ const CONTENT_STYLE = `
   .xtranslator-selection-result[data-state="loading"] .xtranslator-selection-result-text { color: ${DESIGN_TOKEN.color.textOnDark}; opacity: .8; }
   .xtranslator-selection-result[data-state="error"] .xtranslator-selection-result-text { color: ${DESIGN_TOKEN.color.textOnDark}; }
   .xtranslator-selection-result-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-  .xtranslator-selection-action { display: grid; width: 30px; height: 30px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; place-items: center; cursor: pointer; }
+  .xtranslator-selection-action { display: grid; width: 32px; height: 32px; padding: 0; color: ${DESIGN_TOKEN.color.textOnDark}; border: 0; border-radius: ${DESIGN_TOKEN.radius.control}; background: transparent; place-items: center; cursor: pointer; }
   .xtranslator-selection-action svg { display: block; width: 15px; height: 15px; }
   .xtranslator-selection-action:hover { background: rgba(255, 255, 255, 0.12); }
   .xtranslator-selection-action:focus-visible { outline: 2px solid ${DESIGN_TOKEN.color.accentMix}; outline-offset: 1px; }
@@ -86,7 +89,7 @@ const CONTENT_STYLE = `
   .xtranslator-selection-result-text { display: flex; align-items: flex-start; gap: 6px; color: ${DESIGN_TOKEN.color.textOnDark}; overflow-wrap: anywhere; white-space: pre-wrap; }
   .xtranslator-selection-result-text svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
   @keyframes xtranslator-rotate { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .xtranslator-control { transition: none; } .xtranslator-spin { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .xtranslator-control, .xtranslator-description-action, .xtranslator-comment-action { transition: none; } .xtranslator-control:hover, .xtranslator-description-action:hover, .xtranslator-comment-action:hover { transform: none; } .xtranslator-spin { animation: none; } }
 `;
 
 export function ensureContentStyle(documentNode: Document): void {

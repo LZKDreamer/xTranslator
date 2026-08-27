@@ -58,7 +58,7 @@ input {
   margin-bottom: var(--space-24);
   border: var(--border-glass-light);
   border-radius: 22px;
-  background: var(--surface-glass-light);
+  background: var(--surface-glass-light-strong);
   box-shadow: var(--shadow-light), var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
@@ -96,7 +96,7 @@ h1 span {
   padding: var(--space-24);
   border: var(--border-glass-light);
   border-radius: var(--radius-panel);
-  background: var(--surface-glass-light);
+  background: rgba(255, 255, 255, 0.64);
   box-shadow: var(--shadow-light), var(--shadow-glass-inset);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
@@ -142,7 +142,7 @@ select {
 }
 
 .settings-panel h2 {
-  margin: 0;
+  margin: 0 0 2px;
   font-size: var(--font-size-panel-title);
   letter-spacing: var(--letter-spacing-tight);
 }
@@ -190,6 +190,9 @@ select {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  min-height: 32px;
+  padding: 4px var(--space-8);
+  border-radius: 8px;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
 }
@@ -213,6 +216,10 @@ select {
 .subtitle-style-control {
   display: grid;
   gap: var(--space-8);
+  padding: var(--space-12);
+  border: var(--border-input);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.56);
 }
 
 .subtitle-style-control > span {
@@ -339,7 +346,9 @@ button:focus-visible {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-8);
+  padding-top: var(--space-12);
   margin-top: var(--space-8);
+  border-top: 1px solid rgba(90, 106, 151, 0.12);
 }
 
 .secondary-button {
@@ -352,7 +361,7 @@ button:focus-visible {
 .secondary-button {
   color: var(--color-text-primary);
   border: var(--border-glass-light);
-  background: var(--surface-glass-light-strong);
+  background: rgba(255, 255, 255, 0.74);
   box-shadow: var(--shadow-glass-inset);
   transition: background var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast);
 }
@@ -361,6 +370,26 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.8);
   box-shadow: var(--shadow-glass-inset), 0 6px 16px rgba(72, 86, 145, 0.12);
   transform: translateY(-1px);
+}
+
+#load-models:not(:disabled) {
+  color: var(--color-text-on-dark);
+  border-color: rgba(255, 255, 255, 0.34);
+  background: var(--color-accent-violet);
+}
+
+#load-models:not(:disabled):hover {
+  background: #6955ed;
+}
+
+#clear-all-cache {
+  color: var(--color-danger);
+  border-color: rgba(192, 54, 44, 0.22);
+  background: rgba(255, 239, 238, 0.76);
+}
+
+#clear-all-cache:hover {
+  background: rgba(255, 226, 224, 0.9);
 }
 
 .secondary-button:disabled {
@@ -436,6 +465,10 @@ button:focus-visible {
 
   .secondary-button {
     transition: none;
+  }
+
+  .secondary-button:hover {
+    transform: none;
   }
 }
 
